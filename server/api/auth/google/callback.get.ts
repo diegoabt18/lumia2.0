@@ -119,6 +119,9 @@ export default defineEventHandler(async (event) => {
     if (statusCode === 503) {
       return redirectLoginError(event, origin, 'auth_db')
     }
+    if (statusCode === 409) {
+      return redirectLoginError(event, origin, 'email_google_conflict')
+    }
     return redirectLoginError(event, origin, 'oauth_server')
   }
 })

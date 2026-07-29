@@ -10,6 +10,7 @@ export const LOGIN_ERROR_CODES = {
   LG_ERROR004: 'LG_ERROR004',
   LG_ERROR005: 'LG_ERROR005',
   LG_ERROR006: 'LG_ERROR006',
+  LG_ERROR007: 'LG_ERROR007',
 } as const
 
 export type LoginErrorCode = (typeof LOGIN_ERROR_CODES)[keyof typeof LOGIN_ERROR_CODES]
@@ -22,6 +23,7 @@ const SLUG_TO_CODE: Record<string, LoginErrorCode> = {
   google_token: LOGIN_ERROR_CODES.LG_ERROR004,
   google_user: LOGIN_ERROR_CODES.LG_ERROR005,
   oauth_server: LOGIN_ERROR_CODES.LG_ERROR006,
+  email_google_conflict: LOGIN_ERROR_CODES.LG_ERROR007,
 }
 
 /** Mensaje breve para el cliente (sin detalles de infra). */
@@ -33,6 +35,7 @@ const CLIENT_MESSAGES: Record<LoginErrorCode, string> = {
   LG_ERROR004: 'No se pudo completar el inicio de sesión.',
   LG_ERROR005: 'No se pudo completar el inicio de sesión.',
   LG_ERROR006: 'No se pudo completar el inicio de sesión.',
+  LG_ERROR007: 'No se pudo completar el inicio de sesión.',
 }
 
 export function loginErrorCodeFromSlug(slug: string): LoginErrorCode {

@@ -49,7 +49,10 @@ El callback redirige a `/auth/login?error=LG_ERROR00X`. El mensaje en UI es gen�
 | `LG_ERROR003` | `auth_db` — falta o no conecta `NUXT_MONGO_AUTH_URI` |
 | `LG_ERROR004` | `google_token` — falló intercambio code→token con Google |
 | `LG_ERROR005` | `google_user` — id_token inválido o sin email |
-| `LG_ERROR006` | `oauth_server` — excepción no controlada (p. ej. upsert usuario en Mongo) |
+| `LG_ERROR006` | `oauth_server` — excepción no controlada en callback |
+| `LG_ERROR007` | `email_google_conflict` — el email ya está vinculado a otro Google ID (no se sobrescribe) |
 | `LG_ERROR000` | Desconocido |
+
+**Regla de identidad:** `google_id` es único y primario. Si existe un usuario con el mismo email pero distinto `google_id`, el login se rechaza (`409` → `LG_ERROR007`).
 
 Definición compartida: `shared/auth/login-errors.ts`.
