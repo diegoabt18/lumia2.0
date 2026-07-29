@@ -7,6 +7,17 @@ interface ProductsResponse {
   pagination?: { page: number; limit: number; total: number; totalPages: number }
 }
 
+async function fetchWithRetry<T>(url: string, options: { query?: Record<string, unknown>; timeout?: number }): Promise<T> {
+  try {
+    return (await $fetch(url, options)) as T
+  } catch (error) {
+    const status = (error as { statusCode?: number })?.statusCode
+    if (status !== 503 && status !== 504) throw error
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    return (await $fetch(url, { ...options, timeout: 18_000 })) as T
+  }
+}
+
 export function useCatalog() {
   async function fetchProducts(query: {
     limit?: number
@@ -20,7 +31,7 @@ export function useCatalog() {
     const page = Math.max(1, query.page ?? 1)
     const limit = Math.max(1, query.limit ?? 12)
 
-    const res = await $fetch<ProductsResponse>('/api/products', {
+    const res = await fetchWithRetry<ProductsResponse>('/api/products', {
       query: {
         limit,
         page,
@@ -30,7 +41,7 @@ export function useCatalog() {
         promo: query.promo,
         sort: query.sort,
       },
-      timeout: 15_000,
+      timeout: 12_000,
     })
 
     const list = res.products?.length ? res.products : res.items ?? []
@@ -47,7 +58,9 @@ export function useCatalog() {
   }
 
   async function fetchProductBySlug(slug: string) {
-    const res = await $fetch<{ product: Product | null }>(`/api/products/${slug}`, { timeout: 15_000 })
+    const res = await fetchWithRetry<{ product: Product | null }>(`/api/products/${slug}`, {
+      timeout: 12_000,
+    })
     return { product: res.product ?? null, source: 'mongodb' as const }
   }
 

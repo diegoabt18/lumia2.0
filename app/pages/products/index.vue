@@ -58,7 +58,7 @@
             type="button"
             class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold capitalize tracking-wide transition"
             :class="
-              selectedCategories.includes(cat.slug)
+              selectedCategory === cat.slug
                 ? 'border-lumia-ink bg-lumia-ink text-lumia-cream'
                 : 'border-lumia-ink/12 bg-lumia-cream/50 text-lumia-ink/75'
             "
@@ -71,7 +71,7 @@
 
       <div class="flex flex-col gap-8 lg:flex-row lg:gap-12">
         <ProductFiltersSidebar
-          v-model:selected-categories="selectedCategories"
+          v-model:selected-category="selectedCategory"
           v-model:promo-only="promoOnly"
           v-model:favorites-only="favoritesOnly"
           :categories="categories"
@@ -113,7 +113,7 @@
             </p>
           </div>
 
-          <div v-if="pending" class="grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8">
+          <div v-if="pending && !displayProducts.length" class="grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8">
             <div v-for="n in 6" :key="n" class="animate-pulse overflow-hidden rounded-xl bg-lumia-beige/50">
               <div class="aspect-[3/4] bg-lumia-beige" />
             </div>
@@ -129,11 +129,12 @@
           </div>
 
           <div
-            v-else-if="products.length"
-            class="grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8"
+            v-else-if="displayProducts.length"
+            class="relative grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8"
+            :class="pending ? 'opacity-70' : ''"
           >
             <ProductCardPremium
-              v-for="(p, i) in products"
+              v-for="(p, i) in displayProducts"
               :key="p.id"
               :product="p"
               :sales-badge="p.salesBadge ?? null"
@@ -172,8 +173,8 @@
             </p>
           </div>
 
-          <p v-if="favoritesOnly && wishlistCount && products.length" class="mt-6 text-center text-xs text-lumia-ink/45">
-            Mostrando {{ products.length }} de {{ wishlistCount }} favoritos.
+          <p v-if="favoritesOnly && wishlistCount && displayProducts.length" class="mt-6 text-center text-xs text-lumia-ink/45">
+            Mostrando {{ displayProducts.length }} de {{ wishlistCount }} favoritos.
           </p>
         </div>
       </div>
@@ -188,7 +189,7 @@
                 <button type="button" class="text-sm font-semibold text-lumia-gold" @click="filtersDrawerOpen = false">Listo</button>
               </div>
               <ProductFiltersSidebar
-                v-model:selected-categories="selectedCategories"
+                v-model:selected-category="selectedCategory"
                 v-model:promo-only="promoOnly"
                 v-model:favorites-only="favoritesOnly"
                 :categories="categories"
@@ -226,7 +227,9 @@ const sortBy = ref(typeof route.query.sort === 'string' && route.query.sort !== 
 const promoOnly = ref(route.query.promo === '1')
 const favoritesOnly = ref(route.query.favorites === '1')
 const filtersDrawerOpen = ref(false)
-const selectedCategories = ref<string[]>([])
+const selectedCategory = ref('')
+const debouncedCategory = ref('')
+let categoryFetchTimer: ReturnType<typeof setTimeout> | undefined
 let syncingRoute = false
 
 onMounted(() => {
@@ -244,8 +247,9 @@ const sortOptions = [
   { value: 'name-asc', label: 'Nombre A–Z' },
 ]
 
-function categoriesKey(list: string[]) {
-  return [...list].sort().join(',')
+function parseCategoryFromQuery(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw.trim()) return ''
+  return raw.split(',')[0]?.trim() ?? ''
 }
 
 function buildRouteQuery() {
@@ -253,7 +257,7 @@ function buildRouteQuery() {
     page: page.value > 1 ? String(page.value) : undefined,
     limit: limit.value !== 12 ? String(limit.value) : undefined,
     search: searchApplied.value || undefined,
-    category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
+    category: selectedCategory.value || undefined,
     favorites: favoritesOnly.value ? '1' : undefined,
     promo: promoOnly.value ? '1' : undefined,
     sort: sortBy.value !== '--' ? sortBy.value : undefined,
@@ -262,16 +266,10 @@ function buildRouteQuery() {
 
 function routeQueryMatchesState() {
   const q = route.query
-  const expected = buildRouteQuery()
   const pageOk = (Number(q.page) || 1) === page.value
   const limitOk = (Math.min(48, Math.max(12, Number(q.limit) || 12))) === limit.value
   const searchOk = (typeof q.search === 'string' ? q.search : '') === (searchApplied.value || '')
-  const catOk =
-    categoriesKey(
-      typeof q.category === 'string' && q.category.trim()
-        ? q.category.split(',').map((s) => s.trim()).filter(Boolean)
-        : []
-    ) === categoriesKey(selectedCategories.value)
+  const catOk = parseCategoryFromQuery(q.category) === selectedCategory.value
   const favOk = (q.favorites === '1') === favoritesOnly.value
   const promoOk = (q.promo === '1') === promoOnly.value
   const sortRaw = typeof q.sort === 'string' ? q.sort : '--'
@@ -287,13 +285,10 @@ function syncFromRoute() {
     if (qPage !== page.value) page.value = qPage
     if (qLimit !== limit.value) limit.value = qLimit
 
-    const cat = route.query.category
-    const nextCats =
-      typeof cat === 'string' && cat.trim()
-        ? cat.split(',').map((s) => s.trim()).filter(Boolean)
-        : []
-    if (categoriesKey(nextCats) !== categoriesKey(selectedCategories.value)) {
-      selectedCategories.value = nextCats
+    const nextCat = parseCategoryFromQuery(route.query.category)
+    if (nextCat !== selectedCategory.value) {
+      selectedCategory.value = nextCat
+      debouncedCategory.value = nextCat
     }
 
     const search = typeof route.query.search === 'string' ? route.query.search : ''
@@ -318,6 +313,14 @@ function syncFromRoute() {
 }
 
 syncFromRoute()
+debouncedCategory.value = selectedCategory.value
+
+function scheduleCategoryFetch() {
+  if (categoryFetchTimer) clearTimeout(categoryFetchTimer)
+  categoryFetchTimer = setTimeout(() => {
+    debouncedCategory.value = selectedCategory.value
+  }, 280)
+}
 
 function updateRouteQuery() {
   if (syncingRoute || routeQueryMatchesState()) return
@@ -329,7 +332,7 @@ function scrollCatalogTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-const categoryKey = computed(() => selectedCategories.value.join(','))
+const categoryKey = computed(() => debouncedCategory.value)
 const catalogFetchKey = computed(() => {
   const sortKey = sortBy.value !== '--' ? sortBy.value : 'featured'
   const promoKey = promoOnly.value ? 'promo' : 'all'
@@ -361,7 +364,7 @@ function catalogQuery() {
     page: page.value,
     limit: limit.value,
     search: searchApplied.value || undefined,
-    category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
+    category: selectedCategory.value || undefined,
     sort,
     promo,
   })
@@ -382,8 +385,17 @@ const { data, pending, error, refresh } = useAsyncData(
 )
 
 const products = computed(() => data.value?.products ?? [])
+const staleProducts = ref<Product[]>([])
+watch(products, (list) => {
+  if (list.length) staleProducts.value = list
+})
+const displayProducts = computed(() => {
+  if (products.value.length) return products.value
+  if (pending.value && staleProducts.value.length) return staleProducts.value
+  return products.value
+})
 const pagination = computed(() => data.value?.pagination)
-const catalogLoadFailed = computed(() => Boolean(error.value) && !pending.value && !products.value.length)
+const catalogLoadFailed = computed(() => Boolean(error.value) && !pending.value && !displayProducts.value.length)
 
 const rangeStart = computed(() => {
   if (!pagination.value?.total) return 0
@@ -397,7 +409,7 @@ const rangeEnd = computed(() => {
 
 const hasActiveFilters = computed(
   () =>
-    selectedCategories.value.length > 0 ||
+    Boolean(selectedCategory.value) ||
     promoOnly.value ||
     favoritesOnly.value ||
     Boolean(searchApplied.value)
@@ -409,7 +421,7 @@ const catalogCanonicalPath = computed(() => {
   const params = new URLSearchParams()
   if (page.value > 1) params.set('page', String(page.value))
   if (searchApplied.value) params.set('search', searchApplied.value)
-  if (selectedCategories.value.length) params.set('category', selectedCategories.value.join(','))
+  if (selectedCategory.value) params.set('category', selectedCategory.value)
   const qs = params.toString()
   return qs ? `/products?${qs}` : '/products'
 })
@@ -455,7 +467,8 @@ function applySearch() {
 function clearFilters() {
   searchInput.value = ''
   searchApplied.value = ''
-  selectedCategories.value = []
+  selectedCategory.value = ''
+  debouncedCategory.value = ''
   promoOnly.value = false
   favoritesOnly.value = false
   sortBy.value = '--'
@@ -465,11 +478,10 @@ function clearFilters() {
 }
 
 function toggleCategoryChip(slug: string) {
-  const set = new Set(selectedCategories.value)
-  set.has(slug) ? set.delete(slug) : set.add(slug)
-  selectedCategories.value = Array.from(set)
+  selectedCategory.value = selectedCategory.value === slug ? '' : slug
   page.value = 1
   updateRouteQuery()
+  scheduleCategoryFetch()
 }
 
 function toggleFavoritesOnly() {
@@ -492,10 +504,11 @@ function onLimitChange(nextLimit: number) {
   scrollCatalogTop()
 }
 
-watch(selectedCategories, () => {
+watch(selectedCategory, () => {
   if (syncingRoute) return
   page.value = 1
   updateRouteQuery()
+  scheduleCategoryFetch()
 })
 
 watch(favoritesOnly, () => {

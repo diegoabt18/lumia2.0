@@ -17,17 +17,24 @@
     <section v-if="categories.length" class="mt-6 border-t border-lumia-ink/8 pt-6">
       <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">Categoría</h3>
       <ul class="mt-4 space-y-3">
-        <li v-for="cat in categories" :key="cat.slug" class="flex items-start gap-3">
-          <input
-            :id="`cat-${cat.slug}`"
-            type="checkbox"
-            class="mt-0.5 h-4 w-4 rounded border-lumia-ink/20 text-lumia-gold focus:ring-lumia-gold/40"
-            :checked="selectedCategories.includes(cat.slug)"
-            @change="toggleCategory(cat.slug)"
+        <li v-for="cat in categories" :key="cat.slug">
+          <label
+            :for="`cat-${cat.slug}`"
+            class="flex cursor-pointer items-start gap-3"
+            @click.prevent="toggleCategory(cat.slug)"
           >
-          <label :for="`cat-${cat.slug}`" class="flex flex-1 cursor-pointer items-center justify-between gap-2 leading-snug">
-            <span class="text-lumia-ink">{{ cat.name }}</span>
-            <span v-if="cat.productCount != null" class="text-xs text-lumia-ink/40">{{ cat.productCount }}</span>
+            <input
+              :id="`cat-${cat.slug}`"
+              type="radio"
+              name="category-filter"
+              class="mt-0.5 h-4 w-4 border-lumia-ink/20 text-lumia-gold focus:ring-lumia-gold/40"
+              :checked="selectedCategory === cat.slug"
+              tabindex="-1"
+            >
+            <span class="flex flex-1 items-center justify-between gap-2 leading-snug">
+              <span class="text-lumia-ink">{{ cat.name }}</span>
+              <span v-if="cat.productCount != null" class="text-xs text-lumia-ink/40">{{ cat.productCount }}</span>
+            </span>
           </label>
         </li>
       </ul>
@@ -85,13 +92,11 @@ withDefaults(
 
 defineEmits<{ clear: [] }>()
 
-const selectedCategories = defineModel<string[]>('selectedCategories', { default: () => [] })
+const selectedCategory = defineModel<string>('selectedCategory', { default: '' })
 const promoOnlyModel = defineModel<boolean>('promoOnly', { default: false })
 const favoritesOnlyModel = defineModel<boolean>('favoritesOnly', { default: false })
 
 function toggleCategory(slug: string) {
-  const set = new Set(selectedCategories.value)
-  set.has(slug) ? set.delete(slug) : set.add(slug)
-  selectedCategories.value = Array.from(set)
+  selectedCategory.value = selectedCategory.value === slug ? '' : slug
 }
 </script>

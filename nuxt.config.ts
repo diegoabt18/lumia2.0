@@ -73,10 +73,11 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'cloudflare_module',
     routeRules: {
+      '/': { swr: 120 },
       '/api/categories': { swr: 900 },
-      '/api/products': { swr: 60 },
+      '/api/products': { swr: 120 },
       '/api/cdn/images': { swr: 300 },
-      '/products': { swr: 120 },
+      '/products': { swr: 180 },
     },
     alias: {
       '@aws-sdk/credential-providers': mongoOptionalDepStub,

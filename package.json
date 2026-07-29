@@ -22,7 +22,8 @@
     "cf:check": "wrangler check",
     "cf:types": "wrangler types",
     "cf:tail": "wrangler tail",
-    "cf:tail:prod": "wrangler tail --env production"
+    "cf:tail:prod": "wrangler tail --env production",
+    "db:indexes": "node scripts/ensure-atlas-indexes.mjs"
   },
   "dependencies": {
     "@nuxt/image": "^2.1.0",

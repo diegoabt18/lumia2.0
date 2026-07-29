@@ -1,4 +1,5 @@
-import { listCatalogProducts, type CatalogSort } from '../../core/catalog/catalog-listing'
+import type { CatalogSort } from '../../core/catalog/catalog-listing'
+import { listCatalogProductsCached } from '../../utils/catalog-listing-cache'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
 import { withServerTimeout } from '../../utils/server-timeout'
 
@@ -13,10 +14,9 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20))
   const skip = (page - 1) * limit
   const search = typeof query.search === 'string' ? query.search : undefined
-  const categoryRaw = typeof query.category === 'string' ? query.category : undefined
-  const categorySlugs = categoryRaw
-    ? categoryRaw.split(',').map((s) => s.trim()).filter(Boolean)
-    : undefined
+  const categoryRaw = typeof query.category === 'string' ? query.category.trim() : undefined
+  const categorySlug = categoryRaw?.split(',')[0]?.trim() || undefined
+  const categorySlugs = categorySlug ? [categorySlug] : undefined
   const slugsRaw = typeof query.slugs === 'string' ? query.slugs : undefined
   const productSlugs = slugsRaw
     ? slugsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 30)
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const { products, total } = await withServerTimeout(
-      listCatalogProducts({
+      listCatalogProductsCached({
         limit,
         skip,
         search,
@@ -35,12 +35,14 @@ export default defineEventHandler(async (event) => {
         promoOnly,
         sort,
       }),
-      12_000,
+      10_000,
       'catalog list'
     )
     const totalPages = Math.max(1, Math.ceil(total / limit))
 
-    setPublicCacheHeaders(event, promoOnly || sort !== 'featured' ? 15 : 45)
+    const cacheSeconds =
+      promoOnly || sort !== 'featured' ? 30 : search || categorySlugs?.length ? 45 : 90
+    setPublicCacheHeaders(event, cacheSeconds)
 
     return {
       products,

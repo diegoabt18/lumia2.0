@@ -67,33 +67,6 @@ const VARIANTS_LOOKUP = {
   },
 } as const
 
-/** Listado catálogo: sin join de inventario (mucho más rápido en Workers). */
-const VARIANTS_LOOKUP_LIGHT = {
-  $lookup: {
-    from: 'variants',
-    let: { productSlug: '$slug' },
-    pipeline: [
-      { $match: { $expr: { $eq: ['$product_slug', '$$productSlug'] } } },
-      { $sort: { price: 1 } },
-      { $limit: 4 },
-      {
-        $project: {
-          sku: 1,
-          product_slug: 1,
-          price: 1,
-          compare_at_price: 1,
-          currency: 1,
-          options: 1,
-          image_path: 1,
-          stock: 1,
-          available: 1,
-        },
-      },
-    ],
-    as: 'variants',
-  },
-} as const
-
 function searchFilter(
   search?: string,
   categorySlugs?: string[],
@@ -101,7 +74,8 @@ function searchFilter(
 ): Record<string, unknown> {
   const s = search?.trim()
   const base: Record<string, unknown> = { status: { $ne: 'inactive' } }
-  if (categorySlugs?.length) base.category_slug = { $in: categorySlugs }
+  if (categorySlugs?.length === 1) base.category_slug = categorySlugs[0]
+  else if (categorySlugs?.length) base.category_slug = { $in: categorySlugs }
   if (productSlugs?.length) base.slug = { $in: productSlugs }
   if (!s) return base
   return {
@@ -217,6 +191,16 @@ export async function listProducts(options: {
   return products
 }
 
+function groupVariantsByProductSlug(variants: VariantDoc[], maxPerProduct = 4): Map<string, VariantDoc[]> {
+  const map = new Map<string, VariantDoc[]>()
+  for (const variant of variants) {
+    const list = map.get(variant.product_slug)
+    if (!list) map.set(variant.product_slug, [variant])
+    else if (list.length < maxPerProduct) list.push(variant)
+  }
+  return map
+}
+
 export async function listProductsPage(options: {
   limit?: number
   skip?: number
@@ -233,36 +217,57 @@ export async function listProductsPage(options: {
   const skip = options.skip ?? 0
   const match = searchFilter(options.search, options.categorySlugs, options.productSlugs)
 
-  const [facetRows, topSlugs, promotions] = await Promise.all([
+  const [productRows, total, topSlugs, promotions] = await Promise.all([
     db
       .collection<ProductDoc>('products')
-      .aggregate([
-        { $match: match },
-        {
-          $facet: {
-            rows: [
-              { $sort: { created_at: -1 } },
-              { $skip: skip },
-              { $limit: limit },
-              VARIANTS_LOOKUP_LIGHT,
-            ],
-            total: [{ $count: 'n' }],
-          },
-        },
-      ])
-      .toArray(),
+      .find(match)
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .project({
+        name: 1,
+        slug: 1,
+        description: 1,
+        category_slug: 1,
+        created_at: 1,
+        image_path: 1,
+        sales_total_units: 1,
+        average_rating: 1,
+        reviews_count: 1,
+      })
+      .toArray() as Promise<ProductDoc[]>,
+    db.collection<ProductDoc>('products').countDocuments(match),
     findTopSellingSlugsCached(8),
     findActivePromotionsCached(),
   ])
 
-  const facet = facetRows[0] as { rows?: Array<ProductDoc & { variants?: VariantDoc[] }>; total?: Array<{ n: number }> }
-  const rows = facet?.rows ?? []
-  const total = facet?.total?.[0]?.n ?? 0
+  const slugs = productRows.map((row) => row.slug)
+  const variantDocs: VariantDoc[] =
+    slugs.length > 0
+      ? ((await db
+          .collection<VariantDoc>('variants')
+          .find({ product_slug: { $in: slugs } })
+          .project({
+            sku: 1,
+            product_slug: 1,
+            price: 1,
+            compare_at_price: 1,
+            currency: 1,
+            options: 1,
+            image_path: 1,
+            stock: 1,
+            available: 1,
+          })
+          .sort({ product_slug: 1, price: 1 })
+          .toArray()) as VariantDoc[])
+      : []
+
+  const variantsBySlug = groupVariantsByProductSlug(variantDocs)
   const topSet = new Set(topSlugs)
   const now = new Date()
 
-  const products = rows.map((row) => {
-    let product = mapProduct(row, row.variants ?? [])
+  const products = productRows.map((row) => {
+    let product = mapProduct(row, variantsBySlug.get(row.slug) ?? [])
     product = applyPromotionsToProduct(product, promotions, now)
     if (topSet.has(product.slug)) product.salesBadge = 'bestseller'
     else if (row.sales_total_units != null && row.sales_total_units >= 3) {
