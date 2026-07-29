@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth antialiased text-lumia-ink bg-lumia-canvas;
+  }
+  html.dark {
+    color-scheme: dark;
+    @apply bg-zinc-950 text-zinc-100;
+  }
+  body {
+    @apply font-sans text-lumia-ink/90;
+  }
+  html.dark body {
+    @apply text-zinc-200/95;
+  }
+  .font-display {
+    font-family: theme('fontFamily.display');
+  }
+}
+
+@layer components {
+  .lumia-field-input {
+    @apply w-full rounded-xl border border-lumia-ink/[0.12] bg-lumia-canvas/40 px-4 py-3 text-sm text-lumia-ink outline-none transition focus:border-lumia-gold/50 focus:ring-2 focus:ring-lumia-gold/20;
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "lumia2",
+  "main": "./.output/server/index.mjs",
+  "compatibility_date": "2026-07-28",
+  // `nodejs_compat` habilita node:net y node:tls, requeridos por el driver de MongoDB.
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./.output/public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  // Variables no secretas. Secretos → `npm run cf:secrets:prod`.
+  "vars": {
+    "NUXT_SITE_URL": "http://localhost:8787",
+    "NUXT_PUBLIC_STORE_CURRENCY": "COP",
+    "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
+    "NUXT_PUBLIC_STORE_TIMEZONE": "America/Bogota",
+    "NUXT_PUBLIC_STORE_BESTSELLER_TOP_N": "8",
+    "NUXT_PUBLIC_STORE_POPULAR_MIN_UNITS": "3",
+    "NUXT_PUBLIC_CART_CONTINUE_SHOPPING_PATH": "/products",
+    "NUXT_PUBLIC_CART_PAGE_NO_INDEX": "false",
+    "NUXT_PUBLIC_AUTH_LOCAL_PROVIDER_ENABLED": "false",
+    "NUXT_PUBLIC_PRODUCT_IMAGE_GALLERY_LAYOUT": "flat",
+    "NUXT_ORDER_NUMBER_PREFIX": "ORD",
+    "NUXT_ORDER_PAYMENT_TTL_HOURS": "24",
+    "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72"
+  },
+  "env": {
+    "production": {
+      "name": "lumia2",
+      "vars": {
+        "NUXT_SITE_URL": "https://lumia2.tu-usuario.workers.dev",
+        "NUXT_PUBLIC_STORE_CURRENCY": "COP",
+        "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
+        "NUXT_PUBLIC_STORE_TIMEZONE": "America/Bogota",
+        "NUXT_PUBLIC_STORE_BESTSELLER_TOP_N": "8",
+        "NUXT_PUBLIC_STORE_POPULAR_MIN_UNITS": "3",
+        "NUXT_PUBLIC_CART_CONTINUE_SHOPPING_PATH": "/products",
+        "NUXT_PUBLIC_CART_PAGE_NO_INDEX": "false",
+        "NUXT_PUBLIC_AUTH_LOCAL_PROVIDER_ENABLED": "false",
+        "NUXT_PUBLIC_PRODUCT_IMAGE_GALLERY_LAYOUT": "flat",
+        "NUXT_ORDER_NUMBER_PREFIX": "ORD",
+        "NUXT_ORDER_PAYMENT_TTL_HOURS": "24",
+        "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72"
+      }
+      // Dominio propio (descomenta y ajusta tras el primer deploy):
+      // ,"routes": [
+      //   { "pattern": "tudominio.com", "custom_domain": true },
+      //   { "pattern": "www.tudominio.com", "custom_domain": true }
+      // ]
+    }
+  }
+}

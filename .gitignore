@@ -1,0 +1,21 @@
+node_modules
+*.log*
+.nuxt
+.nitro
+.cache
+.output
+.env
+.data
+dist
+
+# Cloudflare
+.wrangler
+.dev.vars
+
+# Editores y sistema
+.DS_Store
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

@@ -1,0 +1,54 @@
+{
+  "name": "lumia2",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lumia 2.0 - Tienda de velas artesanales. Frontend publico serverless sobre Cloudflare Workers.",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "nuxt build && wrangler deploy",
+    "cf:deploy:prod": "nuxt build && wrangler deploy --env production",
+    "cf:secrets": "node scripts/cf-push-secrets.mjs",
+    "cf:secrets:prod": "node scripts/cf-push-secrets.mjs --env production",
+    "cf:secrets:dry": "node scripts/cf-push-secrets.mjs --dry-run",
+    "cf:check": "wrangler check",
+    "cf:types": "wrangler types",
+    "cf:tail": "wrangler tail",
+    "cf:tail:prod": "wrangler tail --env production"
+  },
+  "dependencies": {
+    "@nuxt/image": "^2.1.0",
+    "@pinia/nuxt": "^1.0.1",
+    "@tabler/icons-vue": "^3.46.0",
+    "@vee-validate/zod": "^4.15.1",
+    "@vueuse/core": "^14.3.0",
+    "@vueuse/nuxt": "^14.3.0",
+    "jose": "^6.2.4",
+    "mongodb": "^6.21.0",
+    "nuxt": "^4.5.1",
+    "pinia": "^4.0.2",
+    "vee-validate": "^4.15.1",
+    "vue-sonner": "^2.0.9",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "~3.4.19",
+    "typescript": "~5.9.3",
+    "vue-tsc": "^3.3.8",
+    "wrangler": "^4.115.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260722.1": true
+  }
+}

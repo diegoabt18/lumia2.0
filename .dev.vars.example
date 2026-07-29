@@ -1,0 +1,51 @@
+# =============================================================================
+# Wrangler — variables locales (.dev.vars)
+# =============================================================================
+# Copia a `.dev.vars` para `npm run cf:dev`.
+# Los secretos sensibles van aquí en local; en producción usa `npm run cf:secrets`.
+# =============================================================================
+
+NUXT_SITE_URL=http://localhost:8787
+
+# --- Autenticacion ---
+NUXT_JWT_SECRET=
+NUXT_JWT_REFRESH_SECRET=
+NUXT_GOOGLE_CLIENT_ID=
+NUXT_GOOGLE_CLIENT_SECRET=
+
+# --- MongoDB Atlas ---
+NUXT_MONGO_AUTH_URI=
+NUXT_MONGO_CATALOG_URI=
+NUXT_MONGO_SALES_URI=
+
+# --- Emails (Resend) ---
+NUXT_RESEND_API_KEY=
+NUXT_RESEND_FROM=
+NUXT_ORDER_NOTIFY_EMAIL=
+
+# --- Seguridad ---
+NUXT_TURNSTILE_SECRET_KEY=
+NUXT_PUBLIC_TURNSTILE_SITE_KEY=
+
+# --- Pagos (Mercado Pago — mock hasta activar) ---
+NUXT_MP_ACCESS_TOKEN=
+NUXT_MP_WEBHOOK_SECRET=
+NUXT_PUBLIC_MP_PUBLIC_KEY=
+
+# --- Pedidos ---
+NUXT_ORDER_NUMBER_PREFIX=ORD
+NUXT_ORDER_PAYMENT_TTL_HOURS=24
+NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS=72
+
+# --- Tienda (public) ---
+NUXT_PUBLIC_STORE_CURRENCY=COP
+NUXT_PUBLIC_STORE_LOCALE=es-CO
+NUXT_PUBLIC_STORE_TIMEZONE=America/Bogota
+NUXT_PUBLIC_STORE_BESTSELLER_TOP_N=8
+NUXT_PUBLIC_STORE_POPULAR_MIN_UNITS=3
+NUXT_PUBLIC_CART_CONTINUE_SHOPPING_PATH=/products
+NUXT_PUBLIC_CART_PAGE_NO_INDEX=false
+NUXT_PUBLIC_AUTH_LOCAL_PROVIDER_ENABLED=false
+NUXT_PUBLIC_WHATSAPP_PHONE=
+NUXT_PUBLIC_PRODUCT_IMAGES_CDN_BASE=
+NUXT_PUBLIC_PRODUCT_IMAGE_GALLERY_LAYOUT=flat
