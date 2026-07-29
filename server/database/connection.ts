@@ -10,6 +10,7 @@ interface MongoPool {
 const pools = new Map<string, MongoPool>()
 const lastPingOkAt = new Map<string, number>()
 const PING_TTL_MS = 30_000
+const WORKERS_PING_TTL_MS = 120_000
 let dnsServersConfigured = false
 
 function isCloudflareWorkersRuntime(): boolean {
@@ -77,12 +78,18 @@ async function disposePool(key: string, pool: MongoPool) {
  */
 export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
   ensurePublicDnsForSrv(uri)
+  const onWorkers = isCloudflareWorkersRuntime()
   const key = `${uri}::${dbName}`
   const existing = pools.get(key)
 
   if (existing) {
-    const pingFresh = Date.now() - (lastPingOkAt.get(key) ?? 0) < PING_TTL_MS
+    const pingTtl = onWorkers ? WORKERS_PING_TTL_MS : PING_TTL_MS
+    const pingFresh = Date.now() - (lastPingOkAt.get(key) ?? 0) < pingTtl
     if (pingFresh) return existing.db
+    if (onWorkers) {
+      lastPingOkAt.set(key, Date.now())
+      return existing.db
+    }
     try {
       await pingPool(existing, dbName)
       lastPingOkAt.set(key, Date.now())
@@ -96,9 +103,10 @@ export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
   const client = new MongoClient(uri, mongoClientOptions())
 
   try {
-    await client.connect()
+    await withTimeout(client.connect(), onWorkers ? 4000 : 10000, 'mongo connect')
     const db = client.db(dbName)
     pools.set(key, { client, db })
+    lastPingOkAt.set(key, Date.now())
     return db
   } catch (e) {
     await client.close().catch(() => {})

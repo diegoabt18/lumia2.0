@@ -69,11 +69,16 @@ const { data: featuredData, pending: featuredPending } = await useAsyncData('hom
   catalog.fetchProducts({ limit: 6, page: 1 })
 )
 
-await useAsyncData('home-categories', async () => {
-  const res = await $fetch<{ categories: Parameters<typeof categoryStore.hydrate>[0] }>('/api/categories')
-  if (res.categories?.length) categoryStore.hydrate(res.categories)
-  return res.categories
-})
+await useAsyncData(
+  'catalog-categories',
+  async () => {
+    if (categoryStore.categories.length) return categoryStore.categories
+    const res = await $fetch<{ categories: Parameters<typeof categoryStore.hydrate>[0] }>('/api/categories')
+    if (res.categories?.length) categoryStore.hydrate(res.categories)
+    return res.categories
+  },
+  { lazy: true }
+)
 
 const featuredItems = computed((): Product[] => {
   const list = featuredData.value?.products

@@ -317,18 +317,30 @@ function catalogQuery() {
   })
 }
 
-const [{ data, pending }, categoriesPayload] = await Promise.all([
-  useAsyncData(
-    () => `catalog-${catalogFetchKey.value}`,
-    () => catalogQuery(),
-    { watch: [catalogFetchKey, favoritesOnly, wishlistSlugs] }
-  ),
-  useAsyncData('catalog-categories', () => $fetch<{ categories: typeof categories.value }>('/api/categories')),
-])
+const { data, pending } = useAsyncData(
+  () => `catalog-${catalogFetchKey.value}`,
+  () => catalogQuery(),
+  {
+    watch: [catalogFetchKey, favoritesOnly, wishlistSlugs],
+    lazy: true,
+    default: () => ({
+      products: [] as Product[],
+      source: 'mongodb' as const,
+      pagination: { page: 1, limit: 12, total: 0, totalPages: 1 },
+    }),
+  }
+)
 
-if (categoriesPayload.data.value?.categories?.length) {
-  categoryStore.hydrate(categoriesPayload.data.value.categories)
-}
+useAsyncData(
+  'catalog-categories',
+  async () => {
+    if (categories.value.length) return { categories: categories.value }
+    const res = await $fetch<{ categories: typeof categories.value }>('/api/categories')
+    if (res.categories?.length) categoryStore.hydrate(res.categories)
+    return res
+  },
+  { lazy: true }
+)
 
 const products = computed(() => data.value?.products ?? [])
 const pagination = computed(() => data.value?.pagination)

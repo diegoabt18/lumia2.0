@@ -75,6 +75,7 @@ export default defineNuxtConfig({
     routeRules: {
       '/api/categories': { swr: 900 },
       '/api/products': { swr: 60 },
+      '/products': { swr: 120 },
     },
     alias: {
       '@aws-sdk/credential-providers': mongoOptionalDepStub,

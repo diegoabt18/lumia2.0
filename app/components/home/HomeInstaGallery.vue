@@ -36,10 +36,10 @@ const cdnBase =
   (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
 const maxImages = Math.min(24, Math.max(1, Number(config.public.homeMomentsMaxImages) || 12))
 
-const { data: galleryImages } = await useAsyncData(
+const { data: galleryImages } = useAsyncData(
   'home-moments-gallery',
   () => discoverMomentsGalleryImages(cdnBase, maxImages),
-  { default: () => [] as string[] }
+  { server: false, lazy: true, default: () => [] as string[] }
 )
 
 const images = computed(() => galleryImages.value ?? [])

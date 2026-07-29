@@ -83,7 +83,9 @@ const cdnBase =
 const maxSlides = Math.min(12, Math.max(1, Number(config.public.homeHeroMaxSlides) || 8))
 const intervalMs = Math.max(3000, Number(config.public.homeHeroSlideIntervalMs) || 5500)
 
-const { data: slideData } = await useAsyncData('home-hero-slides', () => discoverHomeHeroSlides(cdnBase, maxSlides), {
+const { data: slideData } = useAsyncData('home-hero-slides', () => discoverHomeHeroSlides(cdnBase, maxSlides), {
+  server: false,
+  lazy: true,
   default: () => [] as string[],
 })
 

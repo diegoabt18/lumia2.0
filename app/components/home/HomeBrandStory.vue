@@ -38,9 +38,9 @@ const config = useRuntimeConfig()
 const cdnBase =
   (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
 
-const { data: historyImage } = await useAsyncData(
+const { data: historyImage } = useAsyncData(
   'home-brand-history-image',
   () => discoverBrandHistoryImage(cdnBase),
-  { default: () => null as string | null }
+  { server: false, lazy: true, default: () => null as string | null }
 )
 </script>

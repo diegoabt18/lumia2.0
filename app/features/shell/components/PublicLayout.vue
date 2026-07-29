@@ -16,18 +16,19 @@ import { useCartStore } from '~/features/cart/stores/cart'
 const cartOpen = ref(false)
 const cartStore = useCartStore()
 
-const { data: cartBootstrap } = await useAsyncData('layout-cart', () =>
-  $fetch<{ items: CartItem[]; source?: string }>('/api/cart').catch(() => ({ items: [], source: 'local' as const }))
+const { data: cartBootstrap } = useAsyncData('layout-cart', () =>
+  $fetch<{ items: CartItem[]; source?: string }>('/api/cart').catch(() => ({ items: [], source: 'local' as const })),
+  { lazy: true }
 )
 
-if (cartBootstrap.value?.source === 'mongo') {
-  cartStore.$patch({
-    items: cartBootstrap.value.items ?? [],
-    apiEnabled: true,
-  })
-} else if (cartBootstrap.value?.source === 'local') {
-  cartStore.$patch({ apiEnabled: false })
-}
+watch(cartBootstrap, (payload) => {
+  if (!payload) return
+  if (payload.source === 'mongo') {
+    cartStore.$patch({ items: payload.items ?? [], apiEnabled: true })
+  } else if (payload.source === 'local') {
+    cartStore.$patch({ apiEnabled: false })
+  }
+}, { immediate: true })
 
 onMounted(() => {
   void cartStore.fetchCart()

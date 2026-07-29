@@ -24,7 +24,7 @@ export async function discoverFixedImage(
 ): Promise<string | null> {
   const url = buildFolderImageUrl(productCdnBase, folder, filename)
   try {
-    const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(4000) })
+    const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(2500) })
     return res.ok ? url : null
   } catch {
     return null
@@ -43,7 +43,7 @@ export async function discoverNumberedImages(
   for (let i = 1; i <= maxCount; i++) {
     const url = buildNumberedImageUrl(folderBase, i)
     try {
-      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(4000) })
+      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(2500) })
       if (!res.ok) break
       images.push(url)
     } catch {
