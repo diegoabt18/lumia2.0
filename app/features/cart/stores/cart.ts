@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia'
 
 import type { CartItem } from '#shared/types/product'
-import { formatVariantLabel } from '#shared/variant-label'
-import { MOCK_PRODUCTS } from '#shared/mocks/products'
 import { useToast } from '~/composables/useToast'
 
 function httpStatusFromError(e: unknown): number | undefined {
@@ -35,18 +33,10 @@ export const useCartStore = defineStore('cart', () => {
     return Boolean(qtyUpdatingByKey.value[sku])
   }
 
-  function findProductBySku(sku: string) {
-    for (const product of MOCK_PRODUCTS) {
-      const variant = product.variants?.find((v) => v.sku === sku)
-      if (variant) return { product, variant }
-    }
-    return null
-  }
-
   function addItemLocal(payload: {
     sku: string
     quantity?: number
-    product?: Pick<CartItem, 'productSlug' | 'productName' | 'variantLabel' | 'unitPrice' | 'currency' | 'imagePath'>
+    product: Pick<CartItem, 'productSlug' | 'productName' | 'variantLabel' | 'unitPrice' | 'currency' | 'imagePath'>
   }) {
     const qty = payload.quantity ?? 1
     const existing = items.value.find((i) => i.sku === payload.sku)
@@ -56,33 +46,15 @@ export const useCartStore = defineStore('cart', () => {
       return true
     }
 
-    if (payload.product) {
-      items.value.push({
-        sku: payload.sku,
-        productSlug: payload.product.productSlug,
-        productName: payload.product.productName,
-        variantLabel: payload.product.variantLabel,
-        quantity: qty,
-        unitPrice: payload.product.unitPrice,
-        currency: payload.product.currency,
-        imagePath: payload.product.imagePath,
-      })
-      return true
-    }
-
-    const match = findProductBySku(payload.sku)
-    if (!match) return false
-
-    const { product, variant } = match
     items.value.push({
-      sku: variant.sku,
-      productSlug: product.slug,
-      productName: product.name,
-      variantLabel: formatVariantLabel(variant.options, variant.sku),
+      sku: payload.sku,
+      productSlug: payload.product.productSlug,
+      productName: payload.product.productName,
+      variantLabel: payload.product.variantLabel,
       quantity: qty,
-      unitPrice: variant.salePrice ?? variant.price,
-      currency: variant.currency ?? 'COP',
-      imagePath: product.imagePath,
+      unitPrice: payload.product.unitPrice,
+      currency: payload.product.currency,
+      imagePath: payload.product.imagePath,
     })
     return true
   }
@@ -125,7 +97,7 @@ export const useCartStore = defineStore('cart', () => {
       if (apiEnabled.value !== false) {
         try {
           if (payload.product) {
-            addItemLocal(payload)
+            addItemLocal({ ...payload, product: payload.product })
             optimistic = true
           }
 
@@ -167,7 +139,11 @@ export const useCartStore = defineStore('cart', () => {
           } else throw e
         }
       }
-      const ok = addItemLocal(payload)
+      if (!payload.product) {
+        useToast().error(MSG_CART_UNAVAILABLE)
+        return false
+      }
+      const ok = addItemLocal({ ...payload, product: payload.product })
       if (ok && payload.product?.productName) {
         useToast().success(`"${payload.product.productName}" agregado al carrito`)
       }
