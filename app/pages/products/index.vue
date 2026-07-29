@@ -120,11 +120,11 @@
           </div>
 
           <div
-            v-else-if="filteredProducts.length"
+            v-else-if="products.length"
             class="grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8"
           >
             <ProductCardPremium
-              v-for="(p, i) in filteredProducts"
+              v-for="(p, i) in products"
               :key="p.id"
               :product="p"
               :sales-badge="p.salesBadge ?? null"
@@ -143,7 +143,7 @@
             <BaseButton type="button" variant="ghost" class="mt-6" @click="clearFilters">Quitar filtros</BaseButton>
           </div>
 
-          <div v-if="pagination && pagination.total > 0 && !favoritesOnly" class="mt-10 border-t border-lumia-ink/8 pt-8">
+          <div v-if="pagination && pagination.total > 0" class="mt-10 border-t border-lumia-ink/8 pt-8">
             <AppPagination
               :page="page"
               :pages="pagination.totalPages"
@@ -159,12 +159,12 @@
               @update:limit="onLimitChange"
             />
             <p v-if="promoOnly" class="mt-3 text-center text-xs text-lumia-ink/45">
-              El filtro de ofertas aplica solo a los productos de esta página.
+              Mostrando productos en oferta según promociones activas.
             </p>
           </div>
 
-          <p v-if="favoritesOnly && wishlistCount && filteredProducts.length" class="mt-6 text-center text-xs text-lumia-ink/45">
-            Mostrando {{ filteredProducts.length }} de {{ wishlistCount }} favoritos.
+          <p v-if="favoritesOnly && wishlistCount && products.length" class="mt-6 text-center text-xs text-lumia-ink/45">
+            Mostrando {{ products.length }} de {{ wishlistCount }} favoritos.
           </p>
         </div>
       </div>
@@ -202,8 +202,6 @@ import { storeToRefs } from 'pinia'
 import type { Product } from '#shared/types/product'
 import { useCategoryStore } from '~/features/category/stores/category'
 
-useHead({ title: 'Catálogo — LUMIA' })
-
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalog()
@@ -215,8 +213,8 @@ const page = ref(Math.max(1, Number(route.query.page) || 1))
 const limit = ref(Math.min(48, Math.max(12, Number(route.query.limit) || 12)))
 const searchInput = ref(typeof route.query.search === 'string' ? route.query.search : '')
 const searchApplied = ref(searchInput.value.trim())
-const sortBy = ref('--')
-const promoOnly = ref(false)
+const sortBy = ref(typeof route.query.sort === 'string' && route.query.sort !== '--' ? route.query.sort : '--')
+const promoOnly = ref(route.query.promo === '1')
 const favoritesOnly = ref(route.query.favorites === '1')
 const filtersDrawerOpen = ref(false)
 const selectedCategories = ref<string[]>([])
@@ -254,6 +252,9 @@ function syncFromRoute() {
   searchInput.value = search
   searchApplied.value = search.trim()
   favoritesOnly.value = route.query.favorites === '1'
+  promoOnly.value = route.query.promo === '1'
+  const sort = typeof route.query.sort === 'string' ? route.query.sort : '--'
+  sortBy.value = sort === '--' || !sort ? '--' : sort
   syncingRoute = false
 }
 
@@ -267,6 +268,8 @@ function updateRouteQuery() {
       search: searchApplied.value || undefined,
       category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
       favorites: favoritesOnly.value ? '1' : undefined,
+      promo: promoOnly.value ? '1' : undefined,
+      sort: sortBy.value !== '--' ? sortBy.value : undefined,
     },
   })
 }
@@ -278,32 +281,46 @@ function scrollCatalogTop() {
 
 const categoryKey = computed(() => selectedCategories.value.join(','))
 const catalogFetchKey = computed(() => {
-  if (favoritesOnly.value) return `fav-${wishlistKey.value}`
-  return `${page.value}-${limit.value}-${searchApplied.value}-${categoryKey.value}`
+  const sortKey = sortBy.value !== '--' ? sortBy.value : 'featured'
+  const promoKey = promoOnly.value ? 'promo' : 'all'
+  if (favoritesOnly.value) return `fav-${wishlistKey.value}-${sortKey}-${promoKey}`
+  return `${page.value}-${limit.value}-${searchApplied.value}-${categoryKey.value}-${sortKey}-${promoKey}`
 })
+
+function catalogQuery() {
+  const sort = sortBy.value !== '--' ? sortBy.value : undefined
+  const promo = promoOnly.value ? '1' : undefined
+  if (favoritesOnly.value) {
+    const slugs = wishlistSlugs.value
+    if (!slugs.length) {
+      return Promise.resolve({
+        products: [] as Product[],
+        source: 'mongodb' as const,
+        pagination: { page: 1, limit: 30, total: 0, totalPages: 1 },
+      })
+    }
+    return catalog.fetchProducts({
+      slugs: slugs.join(','),
+      limit: limit.value,
+      page: page.value,
+      sort,
+      promo,
+    })
+  }
+  return catalog.fetchProducts({
+    page: page.value,
+    limit: limit.value,
+    search: searchApplied.value || undefined,
+    category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
+    sort,
+    promo,
+  })
+}
 
 const [{ data, pending }, categoriesPayload] = await Promise.all([
   useAsyncData(
     () => `catalog-${catalogFetchKey.value}`,
-    () => {
-      if (favoritesOnly.value) {
-        const slugs = wishlistSlugs.value
-        if (!slugs.length) {
-          return Promise.resolve({
-            products: [] as Product[],
-            source: 'mongodb' as const,
-            pagination: { page: 1, limit: 30, total: 0, totalPages: 1 },
-          })
-        }
-        return catalog.fetchProducts({ slugs: slugs.join(','), limit: 30, page: 1 })
-      }
-      return catalog.fetchProducts({
-        page: page.value,
-        limit: limit.value,
-        search: searchApplied.value || undefined,
-        category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
-      })
-    },
+    () => catalogQuery(),
     { watch: [catalogFetchKey, favoritesOnly, wishlistSlugs] }
   ),
   useAsyncData('catalog-categories', () => $fetch<{ categories: typeof categories.value }>('/api/categories')),
@@ -334,39 +351,47 @@ const hasActiveFilters = computed(
     Boolean(searchApplied.value)
 )
 
-function productHasPromo(p: Product) {
-  return p.variants?.some((v) => (v.promotionPercentOff ?? 0) > 0) ?? false
-}
+const siteOrigin = useSiteOrigin()
 
-function getPriceForSort(p: Product) {
-  const prices = p.variants?.map((v) => v.salePrice ?? v.price) ?? []
-  if (prices.length) return Math.min(...prices)
-  return p.fromPrice ?? 0
-}
+const catalogCanonicalPath = computed(() => {
+  const params = new URLSearchParams()
+  if (page.value > 1) params.set('page', String(page.value))
+  if (searchApplied.value) params.set('search', searchApplied.value)
+  if (selectedCategories.value.length) params.set('category', selectedCategories.value.join(','))
+  const qs = params.toString()
+  return qs ? `/products?${qs}` : '/products'
+})
 
-const filteredProducts = computed(() => {
-  let list = [...products.value]
-  if (selectedCategories.value.length) {
-    const set = new Set(selectedCategories.value)
-    list = list.filter((p) => p.categorySlug && set.has(p.categorySlug))
+useHead(() => {
+  const canonical = `${siteOrigin.value}${catalogCanonicalPath.value}`
+  const robots = favoritesOnly.value || promoOnly.value ? 'noindex, follow' : undefined
+
+  return {
+    title: 'Catálogo — LUMIA',
+    meta: [
+      {
+        name: 'description',
+        content: 'Explora velas artesanales LUMIA: aromas, colecciones y promociones.',
+      },
+      ...(robots ? [{ name: 'robots', content: robots }] : []),
+      { property: 'og:title', content: 'Catálogo — LUMIA' },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: canonical },
+    ],
+    link: [{ rel: 'canonical', href: canonical }],
   }
-  if (searchApplied.value) {
-    const q = searchApplied.value.toLowerCase()
-    list = list.filter((p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q))
-  }
-  if (promoOnly.value) list = list.filter(productHasPromo)
-  switch (sortBy.value) {
-    case 'name-asc':
-      list.sort((a, b) => a.name.localeCompare(b.name))
-      break
-    case 'price-asc':
-      list.sort((a, b) => getPriceForSort(a) - getPriceForSort(b))
-      break
-    case 'price-desc':
-      list.sort((a, b) => getPriceForSort(b) - getPriceForSort(a))
-      break
-  }
-  return list
+})
+
+watch(promoOnly, () => {
+  if (syncingRoute) return
+  page.value = 1
+  updateRouteQuery()
+})
+
+watch(sortBy, () => {
+  if (syncingRoute) return
+  page.value = 1
+  updateRouteQuery()
 })
 
 function applySearch() {

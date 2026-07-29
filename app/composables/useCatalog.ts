@@ -30,6 +30,8 @@ export function useCatalog() {
     search?: string
     category?: string
     slugs?: string
+    promo?: string
+    sort?: string
   } = {}) {
     const page = Math.max(1, query.page ?? 1)
     const limit = Math.max(1, query.limit ?? 12)
@@ -42,6 +44,8 @@ export function useCatalog() {
           search: query.search,
           category: query.category,
           slugs: query.slugs,
+          promo: query.promo,
+          sort: query.sort,
         },
       })
       const list = res.products?.length ? res.products : res.items ?? []

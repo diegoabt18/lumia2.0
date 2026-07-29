@@ -37,14 +37,13 @@ export async function getCartItems(cartKey: string): Promise<CartItem[]> {
   return (cart?.items ?? []).map(mapItem)
 }
 
+/** Incrementa qty si existe la SKU; si no, agrega línea (operadores atómicos Mongo). */
 export async function addCartItem(
   cartKey: string,
   input: Omit<CartItemDoc, 'quantity'> & { quantity: number }
 ) {
   const db = await getSalesDb()
-  const cart = await db.collection<CartDoc>('carts').findOne({ userId: cartKey })
-  const items = [...(cart?.items ?? [])]
-  const idx = items.findIndex((i) => i.sku === input.sku)
+  const now = new Date()
   const line: CartItemDoc = {
     sku: input.sku,
     productSlug: input.productSlug,
@@ -55,53 +54,69 @@ export async function addCartItem(
     currency: input.currency,
     imagePath: input.imagePath ?? null,
   }
-  if (idx >= 0) {
-    const existing = items[idx]
-    if (existing) existing.quantity += input.quantity
-  } else items.push(line)
-  await db.collection('carts').updateOne(
-    { userId: cartKey },
-    { $set: { items, updatedAt: new Date() } },
+
+  const inc = await db.collection('carts').updateOne(
+    { userId: cartKey, 'items.sku': input.sku },
+    {
+      $inc: { 'items.$.quantity': input.quantity },
+      $set: { updatedAt: now },
+    }
+  )
+
+  if (inc.matchedCount > 0) return
+
+  const push = await db.collection('carts').updateOne(
+    { userId: cartKey, 'items.sku': { $ne: input.sku } },
+    {
+      $push: { items: line },
+      $set: { updatedAt: now },
+      $setOnInsert: { userId: cartKey },
+    },
     { upsert: true }
   )
+
+  if (push.matchedCount === 0 && push.upsertedCount === 0) {
+    await db.collection('carts').updateOne(
+      { userId: cartKey, 'items.sku': input.sku },
+      {
+        $inc: { 'items.$.quantity': input.quantity },
+        $set: { updatedAt: now },
+      }
+    )
+  }
 }
 
 export async function setCartLineQuantity(cartKey: string, sku: string, quantity: number) {
   if (quantity <= 0) return removeCartItem(cartKey, sku)
   const db = await getSalesDb()
-  const cart = await db.collection<CartDoc>('carts').findOne({ userId: cartKey })
-  if (!cart) return
-  const items = cart.items.map((i) => (i.sku === sku ? { ...i, quantity } : i))
-  await db.collection('carts').updateOne({ userId: cartKey }, { $set: { items, updatedAt: new Date() } })
+  await db.collection('carts').updateOne(
+    { userId: cartKey, 'items.sku': sku },
+    { $set: { 'items.$.quantity': quantity, updatedAt: new Date() } }
+  )
 }
 
 export async function removeCartItem(cartKey: string, sku: string) {
   const db = await getSalesDb()
-  const cart = await db.collection<CartDoc>('carts').findOne({ userId: cartKey })
-  if (!cart) return
-  const items = cart.items.filter((i) => i.sku !== sku)
-  await db.collection('carts').updateOne({ userId: cartKey }, { $set: { items, updatedAt: new Date() } })
+  await db.collection('carts').updateOne(
+    { userId: cartKey },
+    { $pull: { items: { sku } }, $set: { updatedAt: new Date() } }
+  )
 }
 
+/** Fusiona carrito invitado reutilizando addCartItem atómico por línea. */
 export async function mergeGuestCartIntoUser(guestKey: string, userId: string) {
   const db = await getSalesDb()
   const guest = await db.collection<CartDoc>('carts').findOne({ userId: guestKey })
   if (!guest?.items?.length) return
-  const user = await db.collection<CartDoc>('carts').findOne({ userId })
-  const merged = [...(user?.items ?? [])]
+
   for (const item of guest.items) {
-    const idx = merged.findIndex((i) => i.sku === item.sku)
-    if (idx >= 0) {
-      const line = merged[idx]
-      if (line) line.quantity += item.quantity
-    } else merged.push(item)
+    await addCartItem(userId, item)
   }
+
   await db.collection('carts').updateOne(
-    { userId },
-    { $set: { items: merged, updatedAt: new Date() } },
-    { upsert: true }
+    { userId: guestKey },
+    { $set: { items: [], updatedAt: new Date() } }
   )
-  await db.collection('carts').updateOne({ userId: guestKey }, { $set: { items: [], updatedAt: new Date() } })
 }
 
 export function cartResponse(items: CartItem[]) {

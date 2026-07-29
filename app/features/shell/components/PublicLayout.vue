@@ -10,11 +10,27 @@
 </template>
 
 <script setup lang="ts">
+import type { CartItem } from '#shared/types/product'
+import { useCartStore } from '~/features/cart/stores/cart'
+
 const cartOpen = ref(false)
-const { fetchCart } = useCart()
+const cartStore = useCartStore()
+
+const { data: cartBootstrap } = await useAsyncData('layout-cart', () =>
+  $fetch<{ items: CartItem[]; source?: string }>('/api/cart').catch(() => ({ items: [], source: 'local' as const }))
+)
+
+if (cartBootstrap.value?.source === 'mongo') {
+  cartStore.$patch({
+    items: cartBootstrap.value.items ?? [],
+    apiEnabled: true,
+  })
+} else if (cartBootstrap.value?.source === 'local') {
+  cartStore.$patch({ apiEnabled: false })
+}
 
 onMounted(() => {
-  void fetchCart()
+  void cartStore.fetchCart()
   void useWishlist().load()
 })
 </script>

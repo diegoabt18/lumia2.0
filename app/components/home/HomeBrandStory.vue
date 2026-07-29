@@ -4,7 +4,8 @@
       <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <div class="relative aspect-[4/5] overflow-hidden rounded-2xl bg-lumia-beige/50 shadow-soft lg:aspect-auto lg:min-h-[32rem]">
           <NuxtImg
-            src="https://images.unsplash.com/photo-1612196808214-b7e239e5bbae?auto=format&fit=crop&w=1200&q=80"
+            v-if="historyImage"
+            :src="historyImage"
             alt="Artesanía LUMIA"
             class="h-full w-full object-cover"
             sizes="(max-width: 1024px) 100vw, 50vw"
@@ -29,3 +30,17 @@
     </BaseContainer>
   </section>
 </template>
+
+<script setup lang="ts">
+import { discoverBrandHistoryImage } from '~/composables/useHomeHeroImages'
+
+const config = useRuntimeConfig()
+const cdnBase =
+  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
+
+const { data: historyImage } = await useAsyncData(
+  'home-brand-history-image',
+  () => discoverBrandHistoryImage(cdnBase),
+  { default: () => null as string | null }
+)
+</script>

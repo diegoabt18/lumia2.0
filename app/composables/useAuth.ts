@@ -33,9 +33,11 @@ export function useAuth() {
     void fetchUser()
   }
 
-  function loginWithGoogle(returnPath = '/') {
+  function loginWithGoogle(returnPath = '/', turnstileToken?: string) {
     const path = returnPath.startsWith('/') ? returnPath : '/'
-    navigateTo(`/api/auth/google?return=${encodeURIComponent(path)}`, { external: true })
+    const params = new URLSearchParams({ return: path })
+    if (turnstileToken?.trim()) params.set('turnstile', turnstileToken.trim())
+    navigateTo(`/api/auth/google?${params.toString()}`, { external: true })
   }
 
   async function logout() {

@@ -5,6 +5,7 @@ interface OrderEmailPayload {
   currency: string
   phone: string
   items: Array<{ name: string; quantity: number; subtotal: number }>
+  viewOrderUrl?: string | null
 }
 
 function formatMoney(amount: number, currency: string) {
@@ -50,6 +51,10 @@ function buildOrderHtml(order: OrderEmailPayload, intro: string) {
   const lines = order.items
     .map((i) => `<li>${i.name} × ${i.quantity} — ${formatMoney(i.subtotal, order.currency)}</li>`)
     .join('')
+  const viewLink = order.viewOrderUrl
+    ? `<p style="margin-top:20px"><a href="${order.viewOrderUrl}" style="display:inline-block;padding:12px 20px;background:#2B2B2B;color:#fff;text-decoration:none;border-radius:999px;font-size:14px">Ver mi pedido</a></p>
+       <p style="font-size:11px;color:#888;margin-top:8px">Guarda este enlace para consultar el estado de tu pedido.</p>`
+    : ''
   return `
     <div style="font-family:sans-serif;color:#2B2B2B;max-width:560px">
       <p style="font-size:18px;font-weight:600">LUMIA</p>
@@ -59,7 +64,8 @@ function buildOrderHtml(order: OrderEmailPayload, intro: string) {
       <strong>Teléfono:</strong> ${order.phone}<br/>
       <strong>Total:</strong> ${formatMoney(order.total, order.currency)}</p>
       <ul>${lines}</ul>
-      <p style="font-size:12px;color:#666">Pago acordado con el vendedor — pendiente de confirmación.</p>
+      ${viewLink}
+      <p style="font-size:12px;color:#666;margin-top:16px">Pago acordado con el vendedor — pendiente de confirmación.</p>
     </div>
   `
 }
@@ -95,4 +101,18 @@ export async function sendOrderConfirmationEmails(order: OrderEmailPayload, cust
 
   if (!tasks.length) return
   await Promise.allSettled(tasks)
+}
+
+export async function sendNewsletterWelcomeEmail(email: string) {
+  const html = `
+    <div style="font-family:sans-serif;color:#2B2B2B;max-width:560px">
+      <p style="font-size:18px;font-weight:600">LUMIA</p>
+      <p>Gracias por suscribirte. Te avisaremos de lanzamientos y ediciones limitadas.</p>
+    </div>
+  `
+  return sendResendEmail({
+    to: email,
+    subject: 'Suscripción confirmada — LUMIA',
+    html,
+  })
 }

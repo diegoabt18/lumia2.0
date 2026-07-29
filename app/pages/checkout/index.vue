@@ -21,9 +21,7 @@
               <p v-if="user" class="mt-2 text-sm text-lumia-ink/65">Sesión activa: el pedido quedará vinculado a tu cuenta.</p>
               <p v-else class="mt-2 text-sm text-lumia-ink/65">Puedes entrar con Google o comprar como invitado.</p>
             </div>
-            <BaseButton v-if="!user" type="button" variant="secondary" @click="loginWithGoogle('/checkout')">
-              Continuar con Google
-            </BaseButton>
+            <GoogleSignInButton v-if="!user" class="shrink-0 sm:min-w-[240px]" @click="loginWithGoogle('/checkout')" />
           </div>
 
           <form @submit.prevent="onSubmit">
@@ -36,6 +34,16 @@
                 <input id="customerName" v-model="form.customerName" type="text" autocomplete="name" class="lumia-field-input" :class="fieldError('customerName') && 'border-rose-400'" />
                 <p v-if="fieldError('customerName')" class="mt-1 text-xs text-rose-600">{{ fieldError('customerName') }}</p>
               </div>
+
+              <div v-if="!user" class="sm:col-span-2">
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="email">Email</label>
+                <input id="email" v-model="form.email" type="email" autocomplete="email" placeholder="tu@email.com" class="lumia-field-input" :class="fieldError('email') && 'border-rose-400'" />
+                <p v-if="fieldError('email')" class="mt-1 text-xs text-rose-600">{{ fieldError('email') }}</p>
+                <p v-else class="mt-1 text-xs text-lumia-ink/50">Te enviaremos la confirmación del pedido.</p>
+              </div>
+              <p v-else-if="user?.email" class="sm:col-span-2 text-sm text-lumia-ink/60">
+                Confirmación a <span class="font-medium text-lumia-ink">{{ user.email }}</span>
+              </p>
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="phone">Teléfono / WhatsApp</label>
@@ -84,6 +92,14 @@
               </label>
             </div>
 
+            <SecurityTurnstileWidget
+              v-if="turnstileSiteKey"
+              ref="turnstileRef"
+              :site-key="turnstileSiteKey"
+              class="mt-6"
+              @token="onTurnstileToken"
+            />
+
             <p v-if="submitError" class="mt-4 text-sm text-rose-600">{{ submitError }}</p>
 
             <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -97,7 +113,15 @@
           </form>
         </div>
 
-        <CheckoutOrderSummary :items="items" :count="count" :total="total" />
+        <CheckoutOrderSummary
+          :items="items"
+          :count="count"
+          :subtotal="total"
+          :shipping-cost="shippingQuote.shippingCost"
+          :grand-total="shippingQuote.grandTotal"
+          :shipping-variable="shippingQuote.variable"
+          :free-shipping="shippingQuote.freeShipping"
+        />
       </div>
     </BaseContainer>
   </div>
@@ -105,13 +129,21 @@
 
 <script setup lang="ts">
 import { orderCheckoutShippingSchema } from '#shared/schemas/order-checkout'
+import SecurityTurnstileWidget from '~/components/security/TurnstileWidget.vue'
+
+const config = useRuntimeConfig()
+const turnstileSiteKey = computed(() => String(config.public.turnstileSiteKey || '').trim())
 
 const { items, count, total, clearCart } = useCart()
 const { user, loginWithGoogle } = useAuth()
 const toast = useToast()
+const { quote } = useStoreShipping()
+
+const shippingQuote = computed(() => quote(total.value))
 
 const form = reactive({
   customerName: '',
+  email: '',
   phone: '',
   address: '',
   city: '',
@@ -119,10 +151,20 @@ const form = reactive({
   notes: '',
 })
 
+const turnstileToken = ref<string | null>(null)
+const turnstileRef = ref<InstanceType<typeof SecurityTurnstileWidget> | null>(null)
+
+function onTurnstileToken(token: string | null) {
+  turnstileToken.value = token
+}
+
 const acceptTerms = ref(false)
 const isSubmitting = ref(false)
 const submitError = ref('')
 const fieldErrors = ref<Record<string, string>>({})
+const idempotencyKey = useState('checkout-idempotency-key', () =>
+  import.meta.client ? crypto.randomUUID() : 'ssr-checkout-key'
+)
 
 watch(user, (u) => {
   if (u?.name && !form.customerName) form.customerName = u.name
@@ -136,12 +178,28 @@ async function onSubmit() {
   submitError.value = ''
   fieldErrors.value = {}
 
-  const parsed = orderCheckoutShippingSchema.safeParse(form)
+  const payload = {
+    ...form,
+    email: user.value ? undefined : form.email.trim() || undefined,
+    turnstileToken: turnstileToken.value || undefined,
+  }
+
+  const parsed = orderCheckoutShippingSchema.safeParse(payload)
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
       const key = issue.path[0]
       if (typeof key === 'string') fieldErrors.value[key] = issue.message
     }
+    return
+  }
+
+  if (!user.value && !form.email.trim()) {
+    fieldErrors.value.email = 'Indica un email para recibir la confirmación.'
+    return
+  }
+
+  if (turnstileSiteKey.value && !turnstileToken.value) {
+    submitError.value = 'Completa la verificación de seguridad antes de confirmar.'
     return
   }
 
@@ -156,22 +214,32 @@ async function onSubmit() {
       orderNumber: string
       total: number
       paymentStatus: string
+      accessToken: string
     }>('/api/orders/create', {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey.value },
       body: parsed.data,
     })
 
     await clearCart()
+    idempotencyKey.value = crypto.randomUUID()
     toast.success('Pedido registrado')
-    await navigateTo(`/thank-you/${encodeURIComponent(result.orderNumber)}`)
+    await navigateTo({
+      path: '/thank-you',
+      query: { token: result.accessToken },
+    })
   } catch (e: unknown) {
     const err = e as { data?: { message?: string }; message?: string }
     submitError.value = err?.data?.message || err?.message || 'No se pudo crear el pedido'
     toast.error(submitError.value)
+    turnstileRef.value?.reset()
   } finally {
     isSubmitting.value = false
   }
 }
 
-useHead({ title: 'Checkout — LUMIA' })
+useHead({
+  title: 'Checkout — LUMIA',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
+})
 </script>

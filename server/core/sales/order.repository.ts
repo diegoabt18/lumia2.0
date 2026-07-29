@@ -1,7 +1,10 @@
 import { ObjectId } from 'mongodb'
 import type { OrderCheckoutShippingInput } from '#shared/schemas/order-checkout'
 import type { CartItemDoc } from './cart.repository'
+import type { StockReservationLine } from './stock-reservation'
 import { getSalesDb } from '../../database/sales'
+
+export type OrderStockReservationStatus = 'held' | 'released' | 'committed'
 
 export interface OrderItemDoc {
   sku: string
@@ -41,6 +44,8 @@ export interface OrderDoc {
   createdAt: Date
   updatedAt: Date
   expiresAt?: Date
+  stockReservations?: StockReservationLine[]
+  stockReservationStatus?: OrderStockReservationStatus
 }
 
 function normalizeWhatsappDigits(phone: string): string {
@@ -81,12 +86,14 @@ export async function createManualOrder(input: {
   orderNumberPrefix: string
   defaultCurrency: string
   manualPaymentTtlHours: number
+  shippingCost: number
+  stockReservations?: StockReservationLine[]
 }): Promise<{ id: string; orderNumber: string; total: number; currency: string }> {
   if (!input.cartItems.length) throw new Error('CART_EMPTY')
 
   const items = mapItems(input.cartItems)
   const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
-  const shippingCost = 0
+  const shippingCost = Math.max(0, input.shippingCost)
   const tax = 0
   const total = subtotal + shippingCost + tax
   const currency = input.cartItems.find((i) => i.currency)?.currency ?? input.defaultCurrency
@@ -123,6 +130,12 @@ export async function createManualOrder(input: {
     createdAt: now,
     updatedAt: now,
     expiresAt: new Date(now.getTime() + input.manualPaymentTtlHours * 60 * 60 * 1000),
+    ...(input.stockReservations?.length
+      ? {
+          stockReservations: input.stockReservations,
+          stockReservationStatus: 'held' as OrderStockReservationStatus,
+        }
+      : {}),
   }
 
   const db = await getSalesDb()
@@ -138,6 +151,15 @@ export async function createManualOrder(input: {
 export async function getOrderByNumber(orderNumber: string): Promise<OrderDoc | null> {
   const db = await getSalesDb()
   return db.collection<OrderDoc>('orders').findOne({ orderNumber })
+}
+
+export async function getOrderByIdForUser(orderId: string, userId: string): Promise<OrderDoc | null> {
+  if (!ObjectId.isValid(orderId)) return null
+  const db = await getSalesDb()
+  return db.collection<OrderDoc>('orders').findOne({
+    _id: new ObjectId(orderId),
+    userId,
+  })
 }
 
 export async function listOrdersByUserId(userId: string, limit = 20): Promise<OrderDoc[]> {

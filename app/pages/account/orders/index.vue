@@ -38,7 +38,8 @@
         </div>
         <div class="mt-4 flex flex-wrap gap-3">
           <BaseButton
-            :to="`/thank-you/${encodeURIComponent(order.orderNumber)}?view=history`"
+            v-if="order.id"
+            :to="`/account/orders/${encodeURIComponent(order.id)}`"
             variant="ghost"
           >
             Ver detalle

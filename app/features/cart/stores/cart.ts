@@ -12,13 +12,7 @@ function httpStatusFromError(e: unknown): number | undefined {
   return typeof s === 'number' ? s : undefined
 }
 
-const MSG_CART_ADD_NEED_LOGIN = 'Para agregar productos al carrito, inicia sesión.'
-const MSG_CART_NEED_LOGIN = 'Para usar el carrito, inicia sesión.'
-
-function cartAuthToast(message: string) {
-  if (!import.meta.client) return
-  useToast().error(message)
-}
+const MSG_CART_UNAVAILABLE = 'No pudimos actualizar el carrito. Inténtalo de nuevo.'
 
 export const useCartStore = defineStore('cart', () => {
   const items = ref<CartItem[]>([])
@@ -123,23 +117,47 @@ export const useCartStore = defineStore('cart', () => {
     const key = buildAddKey(payload)
     if (addingByKey.value[key]) return false
     addingByKey.value[key] = true
+
+    const prevItems = items.value.map((i) => ({ ...i }))
+    let optimistic = false
+
     try {
       if (apiEnabled.value !== false) {
         try {
-          await $fetch('/api/cart/items', {
+          if (payload.product) {
+            addItemLocal(payload)
+            optimistic = true
+          }
+
+          const res = await $fetch<{ items: CartItem[]; total?: number; ok?: boolean }>('/api/cart/items', {
             method: 'POST',
-            body: { sku: payload.sku, quantity: payload.quantity ?? 1 },
+            body: {
+              sku: payload.sku,
+              quantity: payload.quantity ?? 1,
+              product: payload.product
+                ? {
+                    productSlug: payload.product.productSlug,
+                    productName: payload.product.productName,
+                    variantLabel: payload.product.variantLabel,
+                    currency: payload.product.currency,
+                    imagePath: payload.product.imagePath ?? null,
+                  }
+                : undefined,
+            },
           })
+
           apiEnabled.value = true
-          await fetchCart()
+          if (res.items?.length) items.value = res.items
+
           if (payload.product?.productName) {
             useToast().success(`"${payload.product.productName}" agregado al carrito`)
           }
           return true
         } catch (e) {
+          if (optimistic) items.value = prevItems
           const status = httpStatusFromError(e)
           if (status === 401) {
-            cartAuthToast(MSG_CART_ADD_NEED_LOGIN)
+            useToast().error(MSG_CART_UNAVAILABLE)
             return false
           }
           if (status === 503) apiEnabled.value = false
@@ -159,11 +177,12 @@ export const useCartStore = defineStore('cart', () => {
   async function removeItem(sku: string) {
     if (apiEnabled.value) {
       try {
-        await $fetch('/api/cart/items', { method: 'DELETE', body: { sku } })
-        await fetchCart()
+        const res = await $fetch<{ items: CartItem[] }>('/api/cart/items', { method: 'DELETE', body: { sku } })
+        if (res.items) items.value = res.items
+        else await fetchCart()
       } catch (e) {
         if (httpStatusFromError(e) === 401) {
-          cartAuthToast(MSG_CART_NEED_LOGIN)
+          useToast().error(MSG_CART_UNAVAILABLE)
           return
         }
         throw e
@@ -179,11 +198,15 @@ export const useCartStore = defineStore('cart', () => {
     try {
       if (apiEnabled.value) {
         try {
-          await $fetch('/api/cart/items', { method: 'PATCH', body: { sku, quantity } })
-          await fetchCart()
+          const res = await $fetch<{ items: CartItem[] }>('/api/cart/items', {
+            method: 'PATCH',
+            body: { sku, quantity },
+          })
+          if (res.items) items.value = res.items
+          else await fetchCart()
         } catch (e) {
           if (httpStatusFromError(e) === 401) {
-            cartAuthToast(MSG_CART_NEED_LOGIN)
+            useToast().error(MSG_CART_UNAVAILABLE)
             return
           }
           throw e
@@ -206,10 +229,7 @@ export const useCartStore = defineStore('cart', () => {
   async function clearCart() {
     if (apiEnabled.value) {
       try {
-        const snapshot = [...items.value]
-        for (const item of snapshot) {
-          await $fetch('/api/cart/items', { method: 'DELETE', body: { sku: item.sku } })
-        }
+        await $fetch('/api/cart', { method: 'DELETE' })
       } catch {
         /* noop */
       }

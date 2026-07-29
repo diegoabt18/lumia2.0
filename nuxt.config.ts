@@ -111,6 +111,8 @@ export default defineNuxtConfig({
     orderPaymentTtlHours: 24,
     /** TTL en horas para expiración de órdenes con pago manual. */
     orderManualPaymentTtlHours: 72,
+    /** Secreto para cron jobs (`Authorization: Bearer` o header `X-Cron-Secret`). */
+    cronSecret: '',
 
     public: {
       storeCurrency: 'COP',
@@ -142,6 +144,14 @@ export default defineNuxtConfig({
       turnstileSiteKey: '',
       /** Umbral COP para barra de envío gratis; 0 = oculta la barra. */
       storeFreeShippingThreshold: 0,
+      /** Tarifa fija COP; 0 = envío a confirmar con el vendedor. */
+      storeShippingFlatRate: 0,
+      /** Máximo de imágenes hero a detectar (`home/image_1.avif` …). */
+      homeHeroMaxSlides: 8,
+      /** Intervalo entre slides del hero (ms). */
+      homeHeroSlideIntervalMs: 5500,
+      /** Máximo de imágenes en galería momentos (`moments/image_1.avif` …). */
+      homeMomentsMaxImages: 12,
     },
   },
 })

@@ -524,14 +524,56 @@ const addToCartPending = computed(() => {
   return isAdding({ sku: selectedVariant.value.sku })
 })
 
+const siteOrigin = useSiteOrigin()
+
 useHead(() => {
   const p = product.value
   if (!p) return { title: 'Producto — LUMIA' }
+  const origin = siteOrigin.value
   const desc = (p.description ?? '').slice(0, 160)
   const img = editorialFallbackSrc.value
+  const canonical = `${origin}/products/${encodeURIComponent(p.slug)}`
+  const variant = selectedVariant.value
+  const inStock = (variant?.available != null ? variant.available : variant?.stock ?? 0) > 0
+
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: p.name,
+    description: p.description ?? undefined,
+    image: img || undefined,
+    sku: variant?.sku,
+    brand: { '@type': 'Brand', name: 'LUMIA' },
+    offers: {
+      '@type': 'Offer',
+      url: canonical,
+      priceCurrency: variant?.currency ?? 'COP',
+      price: String(displaySalePrice.value ?? 0),
+      availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    },
+  }
+
+  if (p.averageRating != null && p.reviewsCount) {
+    jsonLd.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: String(p.averageRating),
+      reviewCount: String(p.reviewsCount),
+    }
+  }
+
   return {
     title: `${p.name} · LUMIA`,
-    meta: [{ name: 'description', content: desc }, ...(img ? [{ property: 'og:image', content: img }] : [])],
+    meta: [
+      { name: 'description', content: desc },
+      { property: 'og:title', content: p.name },
+      { property: 'og:description', content: desc },
+      { property: 'og:type', content: 'product' },
+      { property: 'og:url', content: canonical },
+      ...(img ? [{ property: 'og:image', content: img }] : []),
+      { name: 'twitter:card', content: 'summary_large_image' },
+    ],
+    link: [{ rel: 'canonical', href: canonical }],
+    script: [{ type: 'application/ld+json', innerHTML: JSON.stringify(jsonLd) }],
   }
 })
 </script>

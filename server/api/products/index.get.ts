@@ -1,5 +1,10 @@
-import { listProductsPage } from '../../core/catalog/infrastructure/product.repository'
+import { listCatalogProducts, type CatalogSort } from '../../core/catalog/catalog-listing'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
+
+function parseSort(raw: unknown): CatalogSort {
+  if (raw === 'name-asc' || raw === 'price-asc' || raw === 'price-desc') return raw
+  return 'featured'
+}
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -15,12 +20,22 @@ export default defineEventHandler(async (event) => {
   const productSlugs = slugsRaw
     ? slugsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 30)
     : undefined
+  const promoOnly = query.promo === '1' || query.promo === 'true'
+  const sort = parseSort(query.sort)
 
   try {
-    const { products, total } = await listProductsPage({ limit, skip, search, categorySlugs, productSlugs })
+    const { products, total } = await listCatalogProducts({
+      limit,
+      skip,
+      search,
+      categorySlugs,
+      productSlugs,
+      promoOnly,
+      sort,
+    })
     const totalPages = Math.max(1, Math.ceil(total / limit))
 
-    setPublicCacheHeaders(event, 45)
+    setPublicCacheHeaders(event, promoOnly || sort !== 'featured' ? 15 : 45)
 
     return {
       products,

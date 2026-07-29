@@ -10,11 +10,12 @@
       </div>
       <div class="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 lg:grid-cols-6">
         <div
-          v-for="(src, i) in images"
-          :key="i"
+          v-for="(src, i) in displaySlots"
+          :key="src ? `${src}-${i}` : `placeholder-${i}`"
           class="aspect-square overflow-hidden rounded-lg bg-lumia-beige/60"
         >
           <NuxtImg
+            v-if="src"
             :src="src"
             alt=""
             class="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
@@ -28,12 +29,25 @@
 </template>
 
 <script setup lang="ts">
-const images = [
-  'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1612196808214-b7e239e5bbae?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1513885535751-8b9238be345a?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1603006905004-6f2b1d3b0b0b?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=600&q=80',
-]
+import { discoverMomentsGalleryImages } from '~/composables/useHomeHeroImages'
+
+const config = useRuntimeConfig()
+const cdnBase =
+  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
+const maxImages = Math.min(24, Math.max(1, Number(config.public.homeMomentsMaxImages) || 12))
+
+const { data: galleryImages } = await useAsyncData(
+  'home-moments-gallery',
+  () => discoverMomentsGalleryImages(cdnBase, maxImages),
+  { default: () => [] as string[] }
+)
+
+const images = computed(() => galleryImages.value ?? [])
+
+const PLACEHOLDER_COUNT = 6
+
+const displaySlots = computed(() => {
+  if (images.value.length) return images.value
+  return Array.from({ length: PLACEHOLDER_COUNT }, () => null as string | null)
+})
 </script>

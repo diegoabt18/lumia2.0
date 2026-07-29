@@ -15,14 +15,51 @@
 import type { Product } from '#shared/types/product'
 import { useCategoryStore } from '~/features/category/stores/category'
 
-useHead({
-  title: 'LUMIA — Velas artesanales',
-  meta: [
-    {
-      name: 'description',
-      content: 'Velas artesanales elaboradas a mano. Luz cálida y aromas que transforman tu hogar.',
-    },
-  ],
+const siteOrigin = useSiteOrigin()
+
+useHead(() => {
+  const origin = siteOrigin.value
+  const canonical = `${origin}/`
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        name: 'LUMIA',
+        url: origin,
+        description: 'Velas artesanales elaboradas a mano. Luz cálida y aromas que transforman tu hogar.',
+      },
+      {
+        '@type': 'WebSite',
+        name: 'LUMIA',
+        url: origin,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${origin}/products?search={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
+      },
+    ],
+  }
+
+  return {
+    title: 'LUMIA — Velas artesanales',
+    meta: [
+      {
+        name: 'description',
+        content: 'Velas artesanales elaboradas a mano. Luz cálida y aromas que transforman tu hogar.',
+      },
+      { property: 'og:title', content: 'LUMIA — Velas artesanales' },
+      {
+        property: 'og:description',
+        content: 'Velas artesanales elaboradas a mano. Luz cálida y aromas que transforman tu hogar.',
+      },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: canonical },
+    ],
+    link: [{ rel: 'canonical', href: canonical }],
+    script: [{ type: 'application/ld+json', innerHTML: JSON.stringify(jsonLd) }],
+  }
 })
 
 const catalog = useCatalog()

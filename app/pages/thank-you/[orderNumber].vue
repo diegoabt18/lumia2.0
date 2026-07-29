@@ -1,171 +1,52 @@
-<template>
-  <div class="bg-lumia-canvas pb-24 pt-6 md:pt-10">
-    <BaseContainer>
-      <div class="mx-auto max-w-2xl">
-        <template v-if="errorMessage">
-          <div class="text-center">
-            <h1 class="font-display text-3xl text-lumia-ink">Orden no encontrada</h1>
-            <p class="mt-3 text-lumia-ink/65">{{ errorMessage }}</p>
-            <BaseButton to="/account/orders" class="mt-8">Mis pedidos</BaseButton>
-          </div>
-        </template>
-
-        <template v-else-if="pending">
-          <div class="space-y-4 py-16">
-            <div class="mx-auto h-16 w-16 animate-pulse rounded-full bg-lumia-beige/70" />
-            <div class="mx-auto h-6 w-48 animate-pulse rounded bg-lumia-beige/60" />
-            <div class="mx-auto h-4 w-64 animate-pulse rounded bg-lumia-beige/40" />
-          </div>
-        </template>
-
-        <template v-else-if="order">
-          <div class="text-center">
-            <div
-              class="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
-              :class="isHistoryView ? 'bg-lumia-cream' : 'bg-amber-100'"
-            >
-              <span class="text-2xl" :class="isHistoryView ? 'text-lumia-ink/70' : 'text-amber-700'">
-                {{ isHistoryView ? '📦' : '⏳' }}
-              </span>
-            </div>
-            <h1 class="mt-6 font-display text-3xl font-medium text-lumia-ink md:text-4xl">
-              {{ isHistoryView ? 'Detalle del pedido' : '¡Pedido recibido!' }}
-            </h1>
-            <p class="mt-3 text-lumia-ink/65">
-              {{
-                isHistoryView
-                  ? 'Resumen de tu compra y estado actual.'
-                  : 'Hemos registrado tu solicitud. El vendedor se comunicará contigo para coordinar el pago y la entrega.'
-              }}
-            </p>
-          </div>
-
-          <div class="mt-8 rounded-xl border border-lumia-ink/8 bg-white p-6 shadow-soft">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">Número de pedido</p>
-                <p class="mt-1 font-display text-2xl text-lumia-ink">{{ order.orderNumber }}</p>
-                <p class="mt-2 text-sm text-lumia-ink/55">{{ formatStoreDate(order.createdAt) }}</p>
-              </div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">{{ statusLabel(order.paymentStatus) }}</p>
-            </div>
-            <p class="mt-4 text-sm text-lumia-ink/60">
-              Total: <span class="font-medium text-lumia-ink">{{ formatPrice(order.total, order.currency) }}</span>
-            </p>
-          </div>
-
-          <div v-if="order.items.length" class="mt-6 rounded-xl border border-lumia-ink/8 bg-white p-6">
-            <h2 class="font-semibold text-lumia-ink">Productos</h2>
-            <ul class="mt-4 divide-y divide-lumia-ink/8">
-              <li v-for="item in order.items" :key="item.sku" class="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div>
-                  <p class="font-medium text-lumia-ink">{{ item.name }}</p>
-                  <p v-if="item.variantLabel" class="text-sm text-lumia-ink/60">{{ item.variantLabel }}</p>
-                  <p class="text-xs text-lumia-ink/45">{{ item.quantity }} × {{ formatPrice(item.unitPrice, order.currency) }}</p>
-                </div>
-                <p class="font-medium text-lumia-ink">{{ formatPrice(item.subtotal, order.currency) }}</p>
-              </li>
-            </ul>
-            <div class="mt-4 space-y-1 border-t border-lumia-ink/8 pt-4 text-sm text-lumia-ink/70">
-              <div class="flex justify-between"><span>Subtotal</span><span>{{ formatPrice(order.subtotal, order.currency) }}</span></div>
-              <div class="flex justify-between"><span>Envío</span><span>{{ formatPrice(order.shippingCost, order.currency) }}</span></div>
-              <div class="flex justify-between font-semibold text-lumia-ink"><span>Total</span><span>{{ formatPrice(order.total, order.currency) }}</span></div>
-            </div>
-          </div>
-
-          <div class="mt-6 rounded-xl border border-lumia-ink/8 bg-white p-6">
-            <h2 class="font-semibold text-lumia-ink">Entrega</h2>
-            <dl class="mt-4 space-y-2 text-sm text-lumia-ink/75">
-              <div><dt class="text-lumia-ink/45">Nombre</dt><dd>{{ order.customerName }}</dd></div>
-              <div><dt class="text-lumia-ink/45">Teléfono</dt><dd>{{ order.phone }}</dd></div>
-              <div v-if="order.email"><dt class="text-lumia-ink/45">Email</dt><dd>{{ order.email }}</dd></div>
-              <div><dt class="text-lumia-ink/45">Dirección</dt><dd>{{ order.address }}, {{ order.city }}</dd></div>
-              <div v-if="order.reference"><dt class="text-lumia-ink/45">Referencia</dt><dd>{{ order.reference }}</dd></div>
-              <div v-if="order.notes"><dt class="text-lumia-ink/45">Notas</dt><dd>{{ order.notes }}</dd></div>
-            </dl>
-          </div>
-
-          <div v-if="!isHistoryView" class="mt-6 rounded-xl border border-lumia-ink/8 bg-white p-6">
-            <h2 class="font-semibold text-lumia-ink">¿Qué sigue?</h2>
-            <ol class="mt-4 list-inside list-decimal space-y-2 text-sm text-lumia-ink/70">
-              <li>Te contactaremos al {{ order.phone }}.</li>
-              <li>Acordamos el método de pago (transferencia, efectivo, etc.).</li>
-              <li>Cuando confirmemos el pago, preparamos y enviamos tu pedido.</li>
-            </ol>
-          </div>
-
-          <div v-if="whatsappOrder" class="mt-6">
-            <WhatsAppOrderButton :order="whatsappOrder" />
-          </div>
-
-          <div class="mt-8 flex flex-col gap-3">
-            <BaseButton v-if="user" to="/account/orders">Mis pedidos</BaseButton>
-            <BaseButton to="/products" variant="secondary">Seguir comprando</BaseButton>
-          </div>
-        </template>
-      </div>
-    </BaseContainer>
-  </div>
-</template>
-
 <script setup lang="ts">
-import type { OrderSummary } from '#shared/types/order'
-import type { OrderForWhatsApp } from '#shared/whatsapp-message'
-
+/**
+ * Enlaces antiguos con número de orden en la URL → formato seguro.
+ */
 const route = useRoute()
-const { formatPrice, formatStoreDate } = useUtils()
-const { user } = useAuth()
+const token = typeof route.query.token === 'string' ? route.query.token.trim() : ''
 
-const orderNumber = computed(() => String(route.params.orderNumber ?? ''))
-const isHistoryView = computed(() => route.query.view === 'history')
-
-const { data: order, pending, error } = await useAsyncData(
-  () => `thank-you-${orderNumber.value}`,
-  () => $fetch<OrderSummary>(`/api/orders/by-number/${encodeURIComponent(orderNumber.value)}`),
-  { watch: [orderNumber] }
-)
-
-const errorMessage = computed(() => {
-  if (!error.value) return ''
-  const err = error.value as { data?: { message?: string }; message?: string }
-  return err?.data?.message || err?.message || 'No encontramos este pedido.'
-})
-
-function statusLabel(status: string) {
-  if (status === 'pending_manual') return 'Pago pendiente'
-  if (status === 'paid') return 'Pagado'
-  return status
+if (token) {
+  await navigateTo({ path: '/thank-you', query: { token } }, { replace: true })
 }
 
-const whatsappOrder = computed<OrderForWhatsApp | null>(() => {
-  const o = order.value
-  if (!o) return null
-  return {
-    orderNumber: o.orderNumber,
-    createdAt: o.createdAt,
-    customerName: o.customerName,
-    phone: o.phone,
-    email: o.email,
-    address: o.address,
-    city: o.city,
-    reference: o.reference,
-    paymentMethod: 'Pago acordado con el vendedor',
-    status: o.paymentStatus,
-    items: o.items.map((i) => ({
-      name: i.variantLabel ? `${i.name} — ${i.variantLabel}` : i.name,
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      subtotal: i.subtotal,
-    })),
-    subtotal: o.subtotal,
-    shippingCost: o.shippingCost,
-    total: o.total,
-    currency: o.currency,
-    notes: o.notes ?? null,
-  }
-})
+const legacyOrderNumber = String(route.params.orderNumber ?? '').trim()
+const isHistoryView = route.query.view === 'history'
 
-useHead(() => ({
-  title: order.value?.orderNumber ? `Pedido ${order.value.orderNumber} — LUMIA` : 'Gracias — LUMIA',
-}))
+if (isHistoryView && legacyOrderNumber && import.meta.client) {
+  const { user, loaded } = useAuth()
+  await new Promise<void>((resolve) => {
+    if (loaded.value) {
+      resolve()
+      return
+    }
+    const stop = watch(loaded, (value) => {
+      if (value) {
+        stop()
+        resolve()
+      }
+    })
+  })
+
+  if (user.value) {
+    try {
+      const order = await $fetch<{ id?: string }>(
+        `/api/orders/by-number/${encodeURIComponent(legacyOrderNumber)}`
+      )
+      if (order.id) {
+        await navigateTo(`/account/orders/${encodeURIComponent(order.id)}`, { replace: true })
+      }
+    } catch {
+      /* cae al 404 */
+    }
+  }
+}
+
+throw createError({
+  statusCode: 404,
+  message: 'Este enlace ya no es válido. Revisa tu correo o entra a Mis pedidos.',
+})
 </script>
+
+<template>
+  <div />
+</template>

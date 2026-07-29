@@ -184,17 +184,19 @@
                   <div class="flex items-start justify-between gap-3 text-lumia-ink/65">
                     <span>Envío</span>
                     <span class="text-right">
-                      <span class="font-medium text-amber-800">{{ CART_SHIPPING_ROW_LABEL }}</span>
-                      <span class="mt-0.5 block text-[11px] text-lumia-ink/45">{{ CART_SHIPPING_ROW_HINT }}</span>
+                      <span class="font-medium" :class="shippingQuote.variable ? 'text-amber-800' : 'text-lumia-ink'">{{ shippingRowLabel }}</span>
+                      <span v-if="shippingQuote.variable" class="mt-0.5 block text-[11px] text-lumia-ink/45">{{ CART_SHIPPING_ROW_HINT }}</span>
                     </span>
                   </div>
                   <div class="flex items-center justify-between border-t border-lumia-ink/8 pt-3">
                     <span class="font-medium text-lumia-ink">Total estimado</span>
                     <span class="font-display text-xl font-semibold tabular-nums text-lumia-ink">
-                      {{ formatPrice(lineTotal, currency) }}
+                      {{ formatPrice(shippingQuote.grandTotal, currency) }}
                     </span>
                   </div>
-                  <p class="text-[11px] leading-relaxed text-lumia-ink/45">Sin incluir envío. El total final puede variar.</p>
+                  <p class="text-[11px] leading-relaxed text-lumia-ink/45">
+                    {{ shippingQuote.variable ? 'Sin incluir envío. El total final puede variar.' : 'Incluye envío según tarifa configurada.' }}
+                  </p>
                 </div>
 
                 <ul class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-lumia-ink/45">
@@ -267,11 +269,13 @@ onBeforeUnmount(() => {
 
 const cart = useCart()
 const { formatPrice } = useUtils()
+const { quote, freeShippingRemaining } = useStoreShipping()
 const { resolveProductImageSrc } = useProductImages()
 const config = useRuntimeConfig()
 
 const lineItems = computed(() => cart.items.value)
 const lineTotal = computed(() => cart.total.value)
+const shippingQuote = computed(() => quote(lineTotal.value))
 const currency = computed(() => lineItems.value[0]?.currency ?? 'COP')
 const countLabel = computed(() => {
   const n = cart.count.value
@@ -282,8 +286,15 @@ const freeShippingThreshold = computed(() => Number(config.public.storeFreeShipp
 const freeShippingRemainingLabel = computed(() => {
   const threshold = freeShippingThreshold.value
   if (threshold <= 0) return ''
-  const remaining = Math.max(0, threshold - lineTotal.value)
+  const remaining = freeShippingRemaining(lineTotal.value)
   return buildFreeShippingRemainingLabel(remaining, formatPrice, currency.value)
+})
+
+const shippingRowLabel = computed(() => {
+  const q = shippingQuote.value
+  if (q.variable) return CART_SHIPPING_ROW_LABEL
+  if (q.freeShipping) return 'Gratis'
+  return formatPrice(q.shippingCost, currency.value)
 })
 
 function isQtyUpdating(sku: string) {
