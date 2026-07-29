@@ -1,15 +1,19 @@
 /**
- * Sube secretos de `.env` a Cloudflare Workers con `wrangler secret put`.
+ * Sube secretos de `.env` a Cloudflare Workers con `wrangler secret bulk`.
+ *
+ * Requisito: `npx wrangler login` en esta terminal (una sola vez).
  *
  * Uso:
  *   node scripts/cf-push-secrets.mjs
  *   node scripts/cf-push-secrets.mjs --env production
  *   node scripts/cf-push-secrets.mjs --dry-run
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { randomBytes } from 'node:crypto'
 
 const SECRET_KEYS = [
   'NUXT_JWT_SECRET',
@@ -83,27 +87,37 @@ console.log(
     : `Subiendo ${toPush.length} secretos${wranglerEnv ? ` (--env ${wranglerEnv})` : ''}...`
 )
 
-for (const key of toPush) {
-  const value = env.get(key)
-  if (dryRun) {
-    console.log(`  ${key} (${value.length} chars)`)
-    continue
+if (dryRun) {
+  for (const key of toPush) {
+    console.log(`  ${key} (${env.get(key).length} chars)`)
   }
+  process.exit(0)
+}
 
-  const wranglerArgs = ['wrangler', 'secret', 'put', key]
-  if (wranglerEnv) wranglerArgs.push('--env', wranglerEnv)
+const payload = Object.fromEntries(toPush.map((k) => [k, env.get(k)]))
+const tmpFile = join(tmpdir(), `lumia-cf-secrets-${randomBytes(4).toString('hex')}.json`)
+writeFileSync(tmpFile, JSON.stringify(payload), 'utf8')
 
+const wranglerArgs = ['wrangler', 'secret', 'bulk', tmpFile]
+if (wranglerEnv) wranglerArgs.push('--env', wranglerEnv)
+
+try {
   const result = spawnSync('npx', wranglerArgs, {
     cwd: root,
-    input: value,
-    stdio: ['pipe', 'inherit', 'inherit'],
+    stdio: 'inherit',
     shell: true,
   })
 
   if (result.status !== 0) {
-    console.error(`Error al subir ${key}`)
+    console.error('\nSi ves error de autenticación, ejecuta antes: npx wrangler login')
     process.exit(result.status ?? 1)
   }
-}
 
-if (!dryRun) console.log('Secretos actualizados en Cloudflare.')
+  console.log('Secretos actualizados en Cloudflare.')
+} finally {
+  try {
+    unlinkSync(tmpFile)
+  } catch {
+    /* temp ya eliminado */
+  }
+}
