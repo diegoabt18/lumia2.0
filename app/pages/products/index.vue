@@ -120,6 +120,15 @@
           </div>
 
           <div
+            v-else-if="catalogLoadFailed"
+            class="rounded-2xl border border-dashed border-lumia-ink/15 bg-lumia-cream/40 px-8 py-16 text-center"
+          >
+            <p class="font-display text-xl text-lumia-ink/70">No pudimos cargar el catálogo</p>
+            <p class="mt-2 text-sm text-lumia-ink/50">Comprueba tu conexión e inténtalo de nuevo.</p>
+            <BaseButton type="button" variant="secondary" class="mt-6" @click="refresh()">Reintentar</BaseButton>
+          </div>
+
+          <div
             v-else-if="products.length"
             class="grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8"
           >
@@ -358,7 +367,7 @@ function catalogQuery() {
   })
 }
 
-const { data, pending } = useAsyncData(
+const { data, pending, error, refresh } = useAsyncData(
   () => `catalog-${catalogFetchKey.value}`,
   () => catalogQuery(),
   {
@@ -374,6 +383,7 @@ const { data, pending } = useAsyncData(
 
 const products = computed(() => data.value?.products ?? [])
 const pagination = computed(() => data.value?.pagination)
+const catalogLoadFailed = computed(() => Boolean(error.value) && !pending.value && !products.value.length)
 
 const rangeStart = computed(() => {
   if (!pagination.value?.total) return 0

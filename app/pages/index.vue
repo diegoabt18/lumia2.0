@@ -65,11 +65,19 @@ useHead(() => {
 const catalog = useCatalog()
 const categoryStore = useCategoryStore()
 
-const { data: featuredData, pending: featuredPending } = await useAsyncData('home-featured', () =>
-  catalog.fetchProducts({ limit: 6, page: 1 })
+const { data: featuredData, pending: featuredPending } = useAsyncData(
+  'home-featured',
+  () => catalog.fetchProducts({ limit: 6, page: 1 }),
+  {
+    lazy: true,
+    default: () => ({
+      products: [] as Product[],
+      pagination: { page: 1, limit: 6, total: 0, totalPages: 1 },
+    }),
+  }
 )
 
-await useAsyncData(
+useAsyncData(
   'catalog-categories',
   async () => {
     if (categoryStore.categories.length) return categoryStore.categories
