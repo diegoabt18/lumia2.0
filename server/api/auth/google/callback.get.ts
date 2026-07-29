@@ -97,7 +97,13 @@ export default defineEventHandler(async (event) => {
 
     const user = await upsertGoogleUser(googleUser)
     const sessionToken = await signSessionToken(
-      { userId: user.id, email: user.email, role: user.role },
+      {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar,
+        role: user.role,
+      },
       config.jwtSecret
     )
     setSessionCookie(event, sessionToken)

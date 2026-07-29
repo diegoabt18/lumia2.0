@@ -8,6 +8,8 @@ const OAUTH_COOKIE_PATH = '/api/auth/google'
 export interface SessionPayload {
   userId: string
   email: string
+  name?: string
+  avatar?: string
   role: 'user' | 'admin'
 }
 
@@ -54,6 +56,8 @@ export async function verifySessionToken(token: string, secret: string): Promise
     return {
       userId: payload.userId,
       email: payload.email,
+      name: typeof payload.name === 'string' ? payload.name : undefined,
+      avatar: typeof payload.avatar === 'string' ? payload.avatar : undefined,
       role: payload.role === 'admin' ? 'admin' : 'user',
     }
   } catch {

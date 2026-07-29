@@ -10,6 +10,26 @@ interface MongoPool {
 const pools = new Map<string, MongoPool>()
 let dnsServersConfigured = false
 
+function isCloudflareWorkersRuntime(): boolean {
+  return typeof globalThis.caches !== 'undefined' && 'WebSocketPair' in globalThis
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
 /**
  * Algunos DNS de router/ISP (p. ej. GPON) responden a nslookup pero rechazan
  * querySrv desde Node → mongodb+srv:// falla con ECONNREFUSED.
@@ -25,9 +45,33 @@ function ensurePublicDnsForSrv(uri: string) {
   }
 }
 
+function mongoClientOptions() {
+  const onWorkers = isCloudflareWorkersRuntime()
+  return {
+    serverSelectionTimeoutMS: onWorkers ? 5000 : 8000,
+    socketTimeoutMS: onWorkers ? 10000 : 60000,
+    connectTimeoutMS: onWorkers ? 5000 : 10000,
+    maxPoolSize: onWorkers ? 1 : undefined,
+    maxIdleTimeMS: onWorkers ? 10000 : undefined,
+  }
+}
+
+async function pingPool(pool: MongoPool, dbName: string): Promise<void> {
+  await withTimeout(
+    pool.client.db(dbName).command({ ping: 1 }, { serverSelectionTimeoutMS: 2000 }),
+    2500,
+    'mongo ping'
+  )
+}
+
+async function disposePool(key: string, pool: MongoPool) {
+  pools.delete(key)
+  await pool.client.close().catch(() => {})
+}
+
 /**
  * Obtiene (o crea) un pool de conexión MongoDB para una URI + nombre de base.
- * Cacheado a nivel de isolate del Worker — se invalida si el ping falla.
+ * En Workers el ping tiene timeout duro para no colgar el isolate si la conexión quedó zombi.
  */
 export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
   ensurePublicDnsForSrv(uri)
@@ -36,18 +80,14 @@ export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
 
   if (existing) {
     try {
-      await existing.client.db(dbName).command({ ping: 1 }, { serverSelectionTimeoutMS: 3000 })
+      await pingPool(existing, dbName)
       return existing.db
     } catch {
-      await existing.client.close().catch(() => {})
-      pools.delete(key)
+      await disposePool(key, existing)
     }
   }
 
-  const client = new MongoClient(uri, {
-    serverSelectionTimeoutMS: 8000,
-    socketTimeoutMS: 60000,
-  })
+  const client = new MongoClient(uri, mongoClientOptions())
 
   try {
     await client.connect()
