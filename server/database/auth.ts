@@ -32,7 +32,9 @@ export async function upsertGoogleUser(input: {
 }): Promise<{ id: string; email: string; name: string; avatar?: string; role: 'user' | 'admin' }> {
   const db = await getAuthDb()
   const now = new Date()
-  const result = await db.collection<UserDoc>('users').findOneAndUpdate(
+  const coll = db.collection<UserDoc>('users')
+
+  await coll.updateOne(
     { google_id: input.googleId },
     {
       $set: {
@@ -47,10 +49,36 @@ export async function upsertGoogleUser(input: {
         created_at: now,
       },
     },
-    { upsert: true, returnDocument: 'after' }
+    { upsert: true }
   )
-  const doc = result ?? (await db.collection<UserDoc>('users').findOne({ google_id: input.googleId }))
-  if (!doc) throw createError({ statusCode: 500, message: 'No se pudo crear usuario' })
+
+  let doc = await coll.findOne({ google_id: input.googleId })
+
+  // Usuario previo creado solo por email u otro google_id
+  if (!doc) {
+    doc = await coll.findOneAndUpdate(
+      { email: input.email },
+      {
+        $set: {
+          google_id: input.googleId,
+          name: input.name,
+          avatar: input.avatar,
+          updated_at: now,
+        },
+        $setOnInsert: {
+          role: 'user',
+          created_at: now,
+        },
+      },
+      { upsert: true, returnDocument: 'after' }
+    )
+  }
+
+  if (!doc) {
+    console.error('[auth] upsertGoogleUser failed', { googleId: input.googleId, email: input.email })
+    throw createError({ statusCode: 500, message: 'No se pudo crear usuario' })
+  }
+
   return {
     id: doc._id?.toString?.() ?? input.googleId,
     email: doc.email,

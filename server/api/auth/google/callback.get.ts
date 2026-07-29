@@ -1,3 +1,4 @@
+import { loginErrorCodeFromSlug } from '#shared/auth/login-errors'
 import { isAuthDbConfigured, upsertGoogleUser } from '../../../database/auth'
 import { isSalesDbConfigured } from '../../../database/sales'
 import { mergeGuestCartIntoUser } from '../../../core/sales/cart.repository'
@@ -34,6 +35,11 @@ async function exchangeCodeForIdToken(code: string, redirectUri: string, clientI
   return json.id_token ?? null
 }
 
+function redirectLoginError(event: Parameters<typeof sendRedirect>[0], origin: string, slug: string) {
+  const code = loginErrorCodeFromSlug(slug)
+  return sendRedirect(event, `${origin}/auth/login?error=${encodeURIComponent(code)}`)
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
   const origin = resolveSiteOrigin(event)
@@ -42,7 +48,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const oauthError = typeof query.error === 'string' ? query.error : undefined
   if (oauthError) {
-    return sendRedirect(event, `${origin}/auth/login?error=${encodeURIComponent(oauthError)}`)
+    return redirectLoginError(event, origin, oauthError)
   }
 
   const code = typeof query.code === 'string' ? query.code : undefined
@@ -52,10 +58,10 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!config.googleClientId || !config.googleClientSecret || !config.jwtSecret) {
-    return sendRedirect(event, `${origin}/auth/login?error=google_config`)
+    return redirectLoginError(event, origin, 'google_config')
   }
   if (!isAuthDbConfigured()) {
-    return sendRedirect(event, `${origin}/auth/login?error=auth_db`)
+    return redirectLoginError(event, origin, 'auth_db')
   }
 
   const cookieState = getCookie(event, 'oauth_state')
@@ -75,18 +81,18 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!cookieState || !qState || cookieState !== qState) {
-    return sendRedirect(event, `${origin}/auth/login?error=oauth_state`)
+    return redirectLoginError(event, origin, 'oauth_state')
   }
 
   try {
     const idToken = await exchangeCodeForIdToken(code, redirectUri, config.googleClientId, config.googleClientSecret)
     if (!idToken) {
-      return sendRedirect(event, `${origin}/auth/login?error=google_token`)
+      return redirectLoginError(event, origin, 'google_token')
     }
 
     const googleUser = await verifyGoogleIdToken(idToken, config.googleClientId)
     if (!googleUser) {
-      return sendRedirect(event, `${origin}/auth/login?error=google_user`)
+      return redirectLoginError(event, origin, 'google_user')
     }
 
     const user = await upsertGoogleUser(googleUser)
@@ -108,7 +114,11 @@ export default defineEventHandler(async (event) => {
 
     return sendRedirect(event, `${origin}${storedReturnPath}`)
   } catch (e) {
+    const statusCode = (e as { statusCode?: number })?.statusCode
     console.error('[oauth] callback failed', e)
-    return sendRedirect(event, `${origin}/auth/login?error=oauth_server`)
+    if (statusCode === 503) {
+      return redirectLoginError(event, origin, 'auth_db')
+    }
+    return redirectLoginError(event, origin, 'oauth_server')
   }
 })
