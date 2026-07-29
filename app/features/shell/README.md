@@ -14,7 +14,7 @@ Registrado en `app/layouts/default.vue`:
 
 ```vue
 <PublicLayout>
-  <NuxtPage />
+  <slot />
 </PublicLayout>
 ```
 

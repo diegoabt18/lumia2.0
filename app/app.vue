@@ -7,7 +7,7 @@ import 'vue-sonner/style.css'
   <div>
     <NuxtRouteAnnouncer />
     <NuxtLayout>
-      <NuxtPage />
+      <NuxtPage :page-key="(route) => route.fullPath" />
     </NuxtLayout>
     <ClientOnly>
       <Toaster position="top-center" rich-colors close-button :style="{ zIndex: 99999 }" />
