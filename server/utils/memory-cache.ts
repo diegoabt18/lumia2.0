@@ -22,25 +22,10 @@ async function loadAndStore<T>(key: string, loader: () => Promise<T>): Promise<T
   return promise
 }
 
-/** Caché en memoria del Worker con deduplicación y stale-while-revalidate. */
-export async function getCached<T>(
-  key: string,
-  ttlMs: number,
-  loader: () => Promise<T>,
-  staleMs = ttlMs * 4
-): Promise<T> {
-  const now = Date.now()
+/** Caché en memoria del Worker con deduplicación (sin refresh en background). */
+export async function getCached<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
   const hit = stores.get(key) as CacheEntry<T> | undefined
-
-  if (hit) {
-    const age = now - hit.at
-    if (age < ttlMs) return hit.value
-    if (age < staleMs) {
-      void loadAndStore(key, loader).catch(() => {})
-      return hit.value
-    }
-  }
-
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value
   return loadAndStore(key, loader)
 }
 

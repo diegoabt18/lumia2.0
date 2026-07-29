@@ -86,10 +86,6 @@ export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
     const pingTtl = onWorkers ? WORKERS_PING_TTL_MS : PING_TTL_MS
     const pingFresh = Date.now() - (lastPingOkAt.get(key) ?? 0) < pingTtl
     if (pingFresh) return existing.db
-    if (onWorkers) {
-      lastPingOkAt.set(key, Date.now())
-      return existing.db
-    }
     try {
       await pingPool(existing, dbName)
       lastPingOkAt.set(key, Date.now())

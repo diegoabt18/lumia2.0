@@ -37,36 +37,6 @@ export interface VariantDoc {
   option_value_ids?: Array<{ toString(): string }>
 }
 
-const VARIANTS_LOOKUP = {
-  $lookup: {
-    from: 'variants',
-    let: { productSlug: '$slug' },
-    pipeline: [
-      { $match: { $expr: { $eq: ['$product_slug', '$$productSlug'] } } },
-      {
-        $lookup: {
-          from: 'inventory_items',
-          localField: 'sku',
-          foreignField: 'sku',
-          as: 'inventory',
-        },
-      },
-      {
-        $addFields: {
-          stock: { $sum: '$inventory.quantity' },
-          reserved: { $sum: '$inventory.reserved' },
-          available: {
-            $subtract: [{ $sum: '$inventory.quantity' }, { $sum: '$inventory.reserved' }],
-          },
-          is_per_order: { $ifNull: [{ $arrayElemAt: ['$inventory.is_per_order', 0] }, false] },
-        },
-      },
-      { $sort: { price: 1 } },
-    ],
-    as: 'variants',
-  },
-} as const
-
 function searchFilter(
   search?: string,
   categorySlugs?: string[],
@@ -292,29 +262,25 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   const { applyPromotionsToProduct } = await import('../../pricing/apply-product-promotions')
   const db = await getCatalogDb()
 
-  const [rows, topSlugs, promotions] = await Promise.all([
+  const [productDoc, variantDocs, topSlugs, promotions] = await Promise.all([
+    db.collection<ProductDoc>('products').findOne({ slug, status: { $ne: 'inactive' } }),
     db
-      .collection<ProductDoc>('products')
-      .aggregate([
-        { $match: { slug, status: { $ne: 'inactive' } } },
-        { $limit: 1 },
-        VARIANTS_LOOKUP,
-      ])
+      .collection<VariantDoc>('variants')
+      .find({ product_slug: slug })
+      .sort({ price: 1 })
       .toArray(),
     findTopSellingSlugsCached(8),
     findActivePromotionsCached(),
   ])
 
-  const row = rows[0]
-  if (!row) return null
+  if (!productDoc) return null
 
-  const rawVariants = (row as { variants?: VariantDoc[] }).variants ?? []
-  let product = mapProduct(row as ProductDoc, rawVariants)
-  const productId = (row as ProductDoc)._id?.toString?.() ?? product.id
-  await enrichProductDetail(product, rawVariants, productId)
+  let product = mapProduct(productDoc, variantDocs)
+  const productId = productDoc._id?.toString?.() ?? product.id
+  await enrichProductDetail(product, variantDocs, productId)
   product = applyPromotionsToProduct(product, promotions, new Date())
   if (topSlugs.includes(product.slug)) product.salesBadge = 'bestseller'
-  else if ((row as ProductDoc).sales_total_units != null && (row as ProductDoc).sales_total_units! >= 3) {
+  else if (productDoc.sales_total_units != null && productDoc.sales_total_units >= 3) {
     product.salesBadge = 'popular'
   }
   return product

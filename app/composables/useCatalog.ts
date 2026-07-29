@@ -9,12 +9,11 @@ interface ProductsResponse {
 
 async function fetchWithRetry<T>(url: string, options: { query?: Record<string, unknown>; timeout?: number }): Promise<T> {
   try {
-    return (await $fetch(url, options)) as T
+    return (await $fetch(url, { ...options, timeout: options.timeout ?? 8_000 })) as T
   } catch (error) {
     const status = (error as { statusCode?: number })?.statusCode
     if (status !== 503 && status !== 504) throw error
-    await new Promise((resolve) => setTimeout(resolve, 350))
-    return (await $fetch(url, { ...options, timeout: 18_000 })) as T
+    return (await $fetch(url, { ...options, timeout: 10_000 })) as T
   }
 }
 
@@ -41,7 +40,7 @@ export function useCatalog() {
         promo: query.promo,
         sort: query.sort,
       },
-      timeout: 12_000,
+      timeout: 8_000,
     })
 
     const list = res.products?.length ? res.products : res.items ?? []
@@ -59,7 +58,7 @@ export function useCatalog() {
 
   async function fetchProductBySlug(slug: string) {
     const res = await fetchWithRetry<{ product: Product | null }>(`/api/products/${slug}`, {
-      timeout: 12_000,
+      timeout: 8_000,
     })
     return { product: res.product ?? null, source: 'mongodb' as const }
   }

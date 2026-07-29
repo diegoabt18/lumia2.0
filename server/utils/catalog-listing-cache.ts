@@ -14,8 +14,7 @@ function listingCacheKey(options: {
   productSlugs?: string[]
   promoOnly?: boolean
   sort?: CatalogSort
-}): string {
-  const sort = options.sort ?? 'featured'
+}): string {  const sort = options.sort ?? 'featured'
   const categories = [...(options.categorySlugs ?? [])].sort().join(',')
   const slugs = [...(options.productSlugs ?? [])].sort().join(',')
   return [
@@ -54,5 +53,5 @@ export async function listCatalogProductsCached(options: {
 }): Promise<{ products: Product[]; total: number }> {
   const key = listingCacheKey(options)
   const ttlMs = listingTtlMs(options)
-  return getCached(key, ttlMs, () => listCatalogProducts(options), ttlMs * 5)
+  return getCached(key, ttlMs, () => listCatalogProducts(options))
 }

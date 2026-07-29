@@ -81,11 +81,13 @@ useAsyncData(
   'catalog-categories',
   async () => {
     if (categoryStore.categories.length) return categoryStore.categories
-    const res = await $fetch<{ categories: Parameters<typeof categoryStore.hydrate>[0] }>('/api/categories')
+    const res = await $fetch<{ categories: Parameters<typeof categoryStore.hydrate>[0] }>('/api/categories', {
+      timeout: 5_000,
+    }).catch(() => ({ categories: [] }))
     if (res.categories?.length) categoryStore.hydrate(res.categories)
-    return res.categories
+    return res.categories ?? []
   },
-  { lazy: true }
+  { lazy: true, server: false }
 )
 
 const featuredItems = computed((): Product[] => {

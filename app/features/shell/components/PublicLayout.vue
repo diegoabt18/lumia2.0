@@ -16,9 +16,14 @@ import { useCartStore } from '~/features/cart/stores/cart'
 const cartOpen = ref(false)
 const cartStore = useCartStore()
 
-const { data: cartBootstrap } = useAsyncData('layout-cart', () =>
-  $fetch<{ items: CartItem[]; source?: string }>('/api/cart').catch(() => ({ items: [], source: 'local' as const })),
-  { lazy: true }
+const { data: cartBootstrap } = useAsyncData(
+  'layout-cart',
+  () =>
+    $fetch<{ items: CartItem[]; source?: string }>('/api/cart', { timeout: 5_000 }).catch(() => ({
+      items: [],
+      source: 'local' as const,
+    })),
+  { lazy: true, server: false }
 )
 
 watch(cartBootstrap, (payload) => {

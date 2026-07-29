@@ -254,18 +254,21 @@ import { useMediaQuery, useWindowScroll } from '@vueuse/core'
 const route = useRoute()
 const slugParam = computed(() => String(route.params.slug ?? ''))
 
-const { data: detailData, pending: productPending } = await useAsyncData(
+const { data: detailData, pending: productPending } = useAsyncData(
   () => `product-detail-${slugParam.value}`,
-  () => $fetch<{ product: Product | null }>(`/api/products/${encodeURIComponent(slugParam.value)}`),
-  { watch: [slugParam] }
+  () =>
+    $fetch<{ product: Product | null }>(`/api/products/${encodeURIComponent(slugParam.value)}`, {
+      timeout: 8_000,
+    }).catch(() => ({ product: null })),
+  { watch: [slugParam], lazy: true, default: () => ({ product: null }) }
 )
 
 const { fetchProducts } = useCatalog()
 
-const { data: relatedData } = await useAsyncData(
+const { data: relatedData } = useAsyncData(
   () => `pdp-related-${slugParam.value}`,
   () => fetchProducts({ limit: 4, page: 1 }),
-  { lazy: true }
+  { lazy: true, default: () => ({ products: [] as Product[], pagination: { page: 1, limit: 4, total: 0, totalPages: 1 } }) }
 )
 
 const product = computed(() => detailData.value?.product ?? null)

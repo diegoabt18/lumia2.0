@@ -1,4 +1,5 @@
 import { getProductBySlug } from '../../core/catalog/infrastructure/product.repository'
+import { withServerTimeout } from '../../utils/server-timeout'
 
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug')
@@ -7,7 +8,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const product = await getProductBySlug(slug)
+    const product = await withServerTimeout(getProductBySlug(slug), 8_000, 'product detail')
     if (!product) {
       throw createError({ statusCode: 404, message: 'Producto no encontrado' })
     }

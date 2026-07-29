@@ -3,6 +3,7 @@ import {
   discoverNumberedImages,
 } from '#shared/cdn-images/numbered-images'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
+import { withServerTimeout } from '../../utils/server-timeout'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -23,10 +24,10 @@ export default defineEventHandler(async (event) => {
   setPublicCacheHeaders(event, 300)
 
   if (file) {
-    const url = await discoverFixedImage(cdnBase, folder, file)
+    const url = await withServerTimeout(discoverFixedImage(cdnBase, folder, file), 4_000, 'cdn image')
     return { urls: url ? [url] : [] }
   }
 
-  const urls = await discoverNumberedImages(cdnBase, folder, max)
+  const urls = await withServerTimeout(discoverNumberedImages(cdnBase, folder, max), 6_000, 'cdn images')
   return { urls }
 })

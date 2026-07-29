@@ -71,9 +71,9 @@
 
       <div class="flex flex-col gap-8 lg:flex-row lg:gap-12">
         <ProductFiltersSidebar
-          v-model:selected-category="selectedCategory"
-          v-model:promo-only="promoOnly"
-          v-model:favorites-only="favoritesOnly"
+          v-model:selected-category="selectedCategoryModel"
+          v-model:promo-only="promoOnlyModel"
+          v-model:favorites-only="favoritesOnlyModel"
           :categories="categories"
           :favorites-count="wishlistCount"
           :has-active-filters="hasActiveFilters"
@@ -189,9 +189,9 @@
                 <button type="button" class="text-sm font-semibold text-lumia-gold" @click="filtersDrawerOpen = false">Listo</button>
               </div>
               <ProductFiltersSidebar
-                v-model:selected-category="selectedCategory"
-                v-model:promo-only="promoOnly"
-                v-model:favorites-only="favoritesOnly"
+                v-model:selected-category="selectedCategoryModel"
+                v-model:promo-only="promoOnlyModel"
+                v-model:favorites-only="favoritesOnlyModel"
                 :categories="categories"
                 :favorites-count="wishlistCount"
                 :has-active-filters="hasActiveFilters"
@@ -219,18 +219,8 @@ const categoryStore = useCategoryStore()
 const { categories } = storeToRefs(categoryStore)
 const { slugs: wishlistSlugs, load: loadWishlist } = useWishlist()
 
-const page = ref(Math.max(1, Number(route.query.page) || 1))
-const limit = ref(Math.min(48, Math.max(12, Number(route.query.limit) || 12)))
-const searchInput = ref(typeof route.query.search === 'string' ? route.query.search : '')
-const searchApplied = ref(searchInput.value.trim())
-const sortBy = ref(typeof route.query.sort === 'string' && route.query.sort !== '--' ? route.query.sort : '--')
-const promoOnly = ref(route.query.promo === '1')
-const favoritesOnly = ref(route.query.favorites === '1')
+const searchInput = ref('')
 const filtersDrawerOpen = ref(false)
-const selectedCategory = ref('')
-const debouncedCategory = ref('')
-let categoryFetchTimer: ReturnType<typeof setTimeout> | undefined
-let syncingRoute = false
 
 onMounted(() => {
   void loadWishlist()
@@ -252,8 +242,46 @@ function parseCategoryFromQuery(raw: unknown): string {
   return raw.split(',')[0]?.trim() ?? ''
 }
 
-function buildRouteQuery() {
-  return {
+function parseSortFromQuery(raw: unknown): string {
+  if (raw === 'price-asc' || raw === 'price-desc' || raw === 'name-asc') return raw
+  return '--'
+}
+
+/** Filtros derivados de la URL — una sola fuente de verdad, sin bucles sync. */
+const page = computed(() => Math.max(1, Number(route.query.page) || 1))
+const limit = computed(() => Math.min(48, Math.max(12, Number(route.query.limit) || 12)))
+const searchApplied = computed(() => (typeof route.query.search === 'string' ? route.query.search.trim() : ''))
+const selectedCategory = computed(() => parseCategoryFromQuery(route.query.category))
+const promoOnly = computed(() => route.query.promo === '1')
+const favoritesOnly = computed(() => route.query.favorites === '1')
+
+const sortBy = computed({
+  get: () => parseSortFromQuery(route.query.sort),
+  set: (value: string) => {
+    replaceCatalogQuery({ sort: value !== '--' ? value : undefined, page: undefined })
+  },
+})
+
+watch(
+  () => route.query.search,
+  (value) => {
+    searchInput.value = typeof value === 'string' ? value : ''
+  },
+  { immediate: true }
+)
+
+type CatalogQueryPatch = Partial<{
+  page: string | undefined
+  limit: string | undefined
+  search: string | undefined
+  category: string | undefined
+  favorites: string | undefined
+  promo: string | undefined
+  sort: string | undefined
+}>
+
+function buildQueryFromState(patch: CatalogQueryPatch = {}) {
+  const merged: CatalogQueryPatch = {
     page: page.value > 1 ? String(page.value) : undefined,
     limit: limit.value !== 12 ? String(limit.value) : undefined,
     search: searchApplied.value || undefined,
@@ -261,83 +289,40 @@ function buildRouteQuery() {
     favorites: favoritesOnly.value ? '1' : undefined,
     promo: promoOnly.value ? '1' : undefined,
     sort: sortBy.value !== '--' ? sortBy.value : undefined,
+    ...patch,
   }
-}
 
-function routeQueryMatchesState() {
-  const q = route.query
-  const pageOk = (Number(q.page) || 1) === page.value
-  const limitOk = (Math.min(48, Math.max(12, Number(q.limit) || 12))) === limit.value
-  const searchOk = (typeof q.search === 'string' ? q.search : '') === (searchApplied.value || '')
-  const catOk = parseCategoryFromQuery(q.category) === selectedCategory.value
-  const favOk = (q.favorites === '1') === favoritesOnly.value
-  const promoOk = (q.promo === '1') === promoOnly.value
-  const sortRaw = typeof q.sort === 'string' ? q.sort : '--'
-  const sortOk = (sortRaw === '--' || !sortRaw ? '--' : sortRaw) === sortBy.value
-  return pageOk && limitOk && searchOk && catOk && favOk && promoOk && sortOk
-}
-
-function syncFromRoute() {
-  syncingRoute = true
-  try {
-    const qPage = Math.max(1, Number(route.query.page) || 1)
-    const qLimit = Math.min(48, Math.max(12, Number(route.query.limit) || 12))
-    if (qPage !== page.value) page.value = qPage
-    if (qLimit !== limit.value) limit.value = qLimit
-
-    const nextCat = parseCategoryFromQuery(route.query.category)
-    if (nextCat !== selectedCategory.value) {
-      selectedCategory.value = nextCat
-      debouncedCategory.value = nextCat
-    }
-
-    const search = typeof route.query.search === 'string' ? route.query.search : ''
-    if (searchInput.value !== search) searchInput.value = search
-    const nextSearchApplied = search.trim()
-    if (searchApplied.value !== nextSearchApplied) searchApplied.value = nextSearchApplied
-
-    const nextFavorites = route.query.favorites === '1'
-    if (favoritesOnly.value !== nextFavorites) favoritesOnly.value = nextFavorites
-
-    const nextPromo = route.query.promo === '1'
-    if (promoOnly.value !== nextPromo) promoOnly.value = nextPromo
-
-    const sort = typeof route.query.sort === 'string' ? route.query.sort : '--'
-    const nextSort = sort === '--' || !sort ? '--' : sort
-    if (sortBy.value !== nextSort) sortBy.value = nextSort
-  } finally {
-    nextTick(() => {
-      syncingRoute = false
-    })
+  const query: Record<string, string> = {}
+  for (const [key, value] of Object.entries(merged)) {
+    if (value != null && value !== '') query[key] = value
   }
+  return query
 }
 
-syncFromRoute()
-debouncedCategory.value = selectedCategory.value
-
-function scheduleCategoryFetch() {
-  if (categoryFetchTimer) clearTimeout(categoryFetchTimer)
-  categoryFetchTimer = setTimeout(() => {
-    debouncedCategory.value = selectedCategory.value
-  }, 280)
+function replaceCatalogQuery(patch: CatalogQueryPatch) {
+  void router.replace({ query: buildQueryFromState(patch) })
 }
 
-function updateRouteQuery() {
-  if (syncingRoute || routeQueryMatchesState()) return
-  void router.replace({ query: buildRouteQuery() })
-}
+const selectedCategoryModel = computed({
+  get: () => selectedCategory.value,
+  set: (slug: string) => replaceCatalogQuery({ category: slug || undefined, page: undefined }),
+})
 
-function scrollCatalogTop() {
-  if (!import.meta.client) return
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
+const promoOnlyModel = computed({
+  get: () => promoOnly.value,
+  set: (value: boolean) => replaceCatalogQuery({ promo: value ? '1' : undefined, page: undefined }),
+})
 
-const categoryKey = computed(() => debouncedCategory.value)
+const favoritesOnlyModel = computed({
+  get: () => favoritesOnly.value,
+  set: (value: boolean) => replaceCatalogQuery({ favorites: value ? '1' : undefined, page: undefined }),
+})
+
 const catalogFetchKey = computed(() => {
   const sortKey = sortBy.value !== '--' ? sortBy.value : 'featured'
   const promoKey = promoOnly.value ? 'promo' : 'all'
   if (favoritesOnly.value) return `fav-${wishlistKey.value}-${sortKey}-${promoKey}`
-  return `${page.value}-${limit.value}-${searchApplied.value}-${categoryKey.value}-${sortKey}-${promoKey}`
+  return `${page.value}-${limit.value}-${searchApplied.value}-${selectedCategory.value}-${sortKey}-${promoKey}`
 })
 
 function catalogQuery() {
@@ -371,7 +356,7 @@ function catalogQuery() {
 }
 
 const { data, pending, error, refresh } = useAsyncData(
-  () => `catalog-${catalogFetchKey.value}`,
+  'catalog-list',
   () => catalogQuery(),
   {
     watch: [catalogFetchKey],
@@ -446,80 +431,41 @@ useHead(() => {
   }
 })
 
-watch(promoOnly, () => {
-  if (syncingRoute) return
-  page.value = 1
-  updateRouteQuery()
-})
-
-watch(sortBy, () => {
-  if (syncingRoute) return
-  page.value = 1
-  updateRouteQuery()
-})
-
 function applySearch() {
-  searchApplied.value = searchInput.value.trim()
-  page.value = 1
-  updateRouteQuery()
+  replaceCatalogQuery({ search: searchInput.value.trim() || undefined, page: undefined })
 }
 
 function clearFilters() {
   searchInput.value = ''
-  searchApplied.value = ''
-  selectedCategory.value = ''
-  debouncedCategory.value = ''
-  promoOnly.value = false
-  favoritesOnly.value = false
-  sortBy.value = '--'
-  page.value = 1
-  limit.value = 12
   void router.replace({ query: {} })
 }
 
 function toggleCategoryChip(slug: string) {
-  selectedCategory.value = selectedCategory.value === slug ? '' : slug
-  page.value = 1
-  updateRouteQuery()
-  scheduleCategoryFetch()
+  const next = selectedCategory.value === slug ? undefined : slug
+  replaceCatalogQuery({ category: next, page: undefined })
 }
 
 function toggleFavoritesOnly() {
-  favoritesOnly.value = !favoritesOnly.value
-  page.value = 1
-  updateRouteQuery()
+  replaceCatalogQuery({ favorites: favoritesOnly.value ? undefined : '1', page: undefined })
 }
 
 function goPage(next: number) {
   const max = pagination.value?.totalPages ?? 1
-  page.value = Math.min(Math.max(1, next), max)
-  updateRouteQuery()
+  const clamped = Math.min(Math.max(1, next), max)
+  replaceCatalogQuery({ page: clamped > 1 ? String(clamped) : undefined })
   scrollCatalogTop()
 }
 
 function onLimitChange(nextLimit: number) {
-  limit.value = nextLimit
-  page.value = 1
-  updateRouteQuery()
+  replaceCatalogQuery({
+    limit: nextLimit !== 12 ? String(nextLimit) : undefined,
+    page: undefined,
+  })
   scrollCatalogTop()
 }
 
-watch(selectedCategory, () => {
-  if (syncingRoute) return
-  page.value = 1
-  updateRouteQuery()
-  scheduleCategoryFetch()
-})
-
-watch(favoritesOnly, () => {
-  if (syncingRoute) return
-  page.value = 1
-  updateRouteQuery()
-})
-
-watch(
-  () => route.query,
-  () => syncFromRoute(),
-  { deep: true }
-)
+function scrollCatalogTop() {
+  if (!import.meta.client) return
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 </script>
