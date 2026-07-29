@@ -4,7 +4,7 @@
   "main": "./.output/server/index.mjs",
   "compatibility_date": "2026-07-28",
   // `nodejs_compat` habilita node:net y node:tls, requeridos por el driver de MongoDB.
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "no_handle_cross_request_promise_resolution"],
   "assets": {
     "directory": "./.output/public",
     "binding": "ASSETS"

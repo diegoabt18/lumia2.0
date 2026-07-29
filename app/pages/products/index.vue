@@ -222,6 +222,7 @@ let syncingRoute = false
 
 onMounted(() => {
   void loadWishlist()
+  if (!categories.value.length) void categoryStore.fetchCategories()
 })
 
 const wishlistCount = computed(() => wishlistSlugs.value.length)
@@ -234,44 +235,84 @@ const sortOptions = [
   { value: 'name-asc', label: 'Nombre A–Z' },
 ]
 
+function categoriesKey(list: string[]) {
+  return [...list].sort().join(',')
+}
+
+function buildRouteQuery() {
+  return {
+    page: page.value > 1 ? String(page.value) : undefined,
+    limit: limit.value !== 12 ? String(limit.value) : undefined,
+    search: searchApplied.value || undefined,
+    category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
+    favorites: favoritesOnly.value ? '1' : undefined,
+    promo: promoOnly.value ? '1' : undefined,
+    sort: sortBy.value !== '--' ? sortBy.value : undefined,
+  }
+}
+
+function routeQueryMatchesState() {
+  const q = route.query
+  const expected = buildRouteQuery()
+  const pageOk = (Number(q.page) || 1) === page.value
+  const limitOk = (Math.min(48, Math.max(12, Number(q.limit) || 12))) === limit.value
+  const searchOk = (typeof q.search === 'string' ? q.search : '') === (searchApplied.value || '')
+  const catOk =
+    categoriesKey(
+      typeof q.category === 'string' && q.category.trim()
+        ? q.category.split(',').map((s) => s.trim()).filter(Boolean)
+        : []
+    ) === categoriesKey(selectedCategories.value)
+  const favOk = (q.favorites === '1') === favoritesOnly.value
+  const promoOk = (q.promo === '1') === promoOnly.value
+  const sortRaw = typeof q.sort === 'string' ? q.sort : '--'
+  const sortOk = (sortRaw === '--' || !sortRaw ? '--' : sortRaw) === sortBy.value
+  return pageOk && limitOk && searchOk && catOk && favOk && promoOk && sortOk
+}
+
 function syncFromRoute() {
   syncingRoute = true
-  const qPage = Math.max(1, Number(route.query.page) || 1)
-  const qLimit = Math.min(48, Math.max(12, Number(route.query.limit) || 12))
-  if (qPage !== page.value) page.value = qPage
-  if (qLimit !== limit.value) limit.value = qLimit
+  try {
+    const qPage = Math.max(1, Number(route.query.page) || 1)
+    const qLimit = Math.min(48, Math.max(12, Number(route.query.limit) || 12))
+    if (qPage !== page.value) page.value = qPage
+    if (qLimit !== limit.value) limit.value = qLimit
 
-  const cat = route.query.category
-  if (typeof cat === 'string' && cat.trim()) {
-    selectedCategories.value = cat.split(',').map((s) => s.trim()).filter(Boolean)
-  } else if (!cat) {
-    selectedCategories.value = []
+    const cat = route.query.category
+    const nextCats =
+      typeof cat === 'string' && cat.trim()
+        ? cat.split(',').map((s) => s.trim()).filter(Boolean)
+        : []
+    if (categoriesKey(nextCats) !== categoriesKey(selectedCategories.value)) {
+      selectedCategories.value = nextCats
+    }
+
+    const search = typeof route.query.search === 'string' ? route.query.search : ''
+    if (searchInput.value !== search) searchInput.value = search
+    const nextSearchApplied = search.trim()
+    if (searchApplied.value !== nextSearchApplied) searchApplied.value = nextSearchApplied
+
+    const nextFavorites = route.query.favorites === '1'
+    if (favoritesOnly.value !== nextFavorites) favoritesOnly.value = nextFavorites
+
+    const nextPromo = route.query.promo === '1'
+    if (promoOnly.value !== nextPromo) promoOnly.value = nextPromo
+
+    const sort = typeof route.query.sort === 'string' ? route.query.sort : '--'
+    const nextSort = sort === '--' || !sort ? '--' : sort
+    if (sortBy.value !== nextSort) sortBy.value = nextSort
+  } finally {
+    nextTick(() => {
+      syncingRoute = false
+    })
   }
-
-  const search = typeof route.query.search === 'string' ? route.query.search : ''
-  searchInput.value = search
-  searchApplied.value = search.trim()
-  favoritesOnly.value = route.query.favorites === '1'
-  promoOnly.value = route.query.promo === '1'
-  const sort = typeof route.query.sort === 'string' ? route.query.sort : '--'
-  sortBy.value = sort === '--' || !sort ? '--' : sort
-  syncingRoute = false
 }
 
 syncFromRoute()
 
 function updateRouteQuery() {
-  void router.replace({
-    query: {
-      page: page.value > 1 ? String(page.value) : undefined,
-      limit: limit.value !== 12 ? String(limit.value) : undefined,
-      search: searchApplied.value || undefined,
-      category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
-      favorites: favoritesOnly.value ? '1' : undefined,
-      promo: promoOnly.value ? '1' : undefined,
-      sort: sortBy.value !== '--' ? sortBy.value : undefined,
-    },
-  })
+  if (syncingRoute || routeQueryMatchesState()) return
+  void router.replace({ query: buildRouteQuery() })
 }
 
 function scrollCatalogTop() {
@@ -321,7 +362,7 @@ const { data, pending } = useAsyncData(
   () => `catalog-${catalogFetchKey.value}`,
   () => catalogQuery(),
   {
-    watch: [catalogFetchKey, favoritesOnly, wishlistSlugs],
+    watch: [catalogFetchKey],
     lazy: true,
     default: () => ({
       products: [] as Product[],
@@ -329,17 +370,6 @@ const { data, pending } = useAsyncData(
       pagination: { page: 1, limit: 12, total: 0, totalPages: 1 },
     }),
   }
-)
-
-useAsyncData(
-  'catalog-categories',
-  async () => {
-    if (categories.value.length) return { categories: categories.value }
-    const res = await $fetch<{ categories: typeof categories.value }>('/api/categories')
-    if (res.categories?.length) categoryStore.hydrate(res.categories)
-    return res
-  },
-  { lazy: true }
 )
 
 const products = computed(() => data.value?.products ?? [])

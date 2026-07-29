@@ -47,6 +47,7 @@ export function useCatalog() {
           promo: query.promo,
           sort: query.sort,
         },
+        timeout: 12_000,
       })
       const list = res.products?.length ? res.products : res.items ?? []
       return {

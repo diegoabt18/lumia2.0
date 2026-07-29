@@ -1,5 +1,6 @@
 import { listCatalogProducts, type CatalogSort } from '../../core/catalog/catalog-listing'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
+import { withServerTimeout } from '../../utils/server-timeout'
 
 function parseSort(raw: unknown): CatalogSort {
   if (raw === 'name-asc' || raw === 'price-asc' || raw === 'price-desc') return raw
@@ -24,15 +25,19 @@ export default defineEventHandler(async (event) => {
   const sort = parseSort(query.sort)
 
   try {
-    const { products, total } = await listCatalogProducts({
-      limit,
-      skip,
-      search,
-      categorySlugs,
-      productSlugs,
-      promoOnly,
-      sort,
-    })
+    const { products, total } = await withServerTimeout(
+      listCatalogProducts({
+        limit,
+        skip,
+        search,
+        categorySlugs,
+        productSlugs,
+        promoOnly,
+        sort,
+      }),
+      8000,
+      'catalog list'
+    )
     const totalPages = Math.max(1, Math.ceil(total / limit))
 
     setPublicCacheHeaders(event, promoOnly || sort !== 'featured' ? 15 : 45)
@@ -49,6 +54,9 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 503, message: err.message ?? 'Catálogo no disponible' })
     }
     console.error('[api/products]', e)
-    throw createError({ statusCode: 500, message: 'Error al cargar productos' })
+    throw createError({
+      statusCode: 503,
+      message: 'El catálogo tardó demasiado. Inténtalo de nuevo.',
+    })
   }
 })
