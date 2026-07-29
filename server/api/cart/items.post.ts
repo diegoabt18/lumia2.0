@@ -2,6 +2,7 @@ import { isSalesDbConfigured } from '../../database/sales'
 import { addCartItem } from '../../core/sales/cart.repository'
 import { getVariantBySku } from '../../core/catalog/infrastructure/product.repository'
 import { resolveCartSubjectForWrite } from '../../utils/cart-context'
+import { formatVariantLabel } from '#shared/variant-label'
 
 export default defineEventHandler(async (event) => {
   if (!isSalesDbConfigured()) {
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
     sku: variant.sku,
     productSlug: variant.product_slug,
     productName: variant.product_name ?? variant.sku,
+    variantLabel: formatVariantLabel(variant.options, variant.sku),
     quantity: finalQty,
     unitPrice: variant.price,
     currency: variant.currency ?? 'COP',

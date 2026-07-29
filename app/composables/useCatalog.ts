@@ -8,24 +8,48 @@ interface ProductsResponse {
   pagination?: { page: number; limit: number; total: number; totalPages: number }
 }
 
+function paginateMock(page: number, limit: number) {
+  const total = MOCK_PRODUCTS.length
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const skip = (safePage - 1) * limit
+  return {
+    products: MOCK_PRODUCTS.slice(skip, skip + limit),
+    source: 'mock' as const,
+    pagination: { page: safePage, limit, total, totalPages },
+  }
+}
+
 /**
  * Catálogo con fallback automático a mocks si MongoDB no está configurado o falla.
  */
 export function useCatalog() {
-  async function fetchProducts(query: { limit?: number; page?: number; search?: string } = {}) {
+  async function fetchProducts(query: { limit?: number; page?: number; search?: string; category?: string } = {}) {
+    const page = Math.max(1, query.page ?? 1)
+    const limit = Math.max(1, query.limit ?? 12)
+
     try {
-      const res = await $fetch<ProductsResponse>('/api/products', { query })
+      const res = await $fetch<ProductsResponse>('/api/products', {
+        query: {
+          limit,
+          page,
+          search: query.search,
+          category: query.category,
+        },
+      })
       const list = res.products?.length ? res.products : res.items ?? []
-      if (list.length) {
-        return { products: list, source: res.source ?? 'mongodb' as const, pagination: res.pagination }
+      return {
+        products: list,
+        source: res.source ?? ('mongodb' as const),
+        pagination: res.pagination ?? {
+          page,
+          limit,
+          total: list.length,
+          totalPages: 1,
+        },
       }
     } catch {
-      /* fallback below */
-    }
-    return {
-      products: MOCK_PRODUCTS.slice(0, query.limit ?? MOCK_PRODUCTS.length),
-      source: 'mock' as const,
-      pagination: undefined,
+      return paginateMock(page, limit)
     }
   }
 

@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
       sku: i.sku,
       productSlug: i.productSlug,
       productName: i.productName,
+      variantLabel: i.variantLabel,
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       currency: i.currency,
@@ -80,7 +81,7 @@ export default defineEventHandler(async (event) => {
       currency: result.currency,
       phone: parsed.data.phone,
       items: cartItems.map((i) => ({
-        name: i.productName,
+        name: i.variantLabel ? `${i.productName} — ${i.variantLabel}` : i.productName,
         quantity: i.quantity,
         subtotal: i.unitPrice * i.quantity,
       })),

@@ -2,6 +2,7 @@ export interface OrderItem {
   sku: string
   productSlug?: string
   name: string
+  variantLabel?: string
   quantity: number
   unitPrice: number
   subtotal: number

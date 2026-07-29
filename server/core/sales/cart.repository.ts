@@ -5,6 +5,7 @@ export interface CartItemDoc {
   sku: string
   productSlug: string
   productName: string
+  variantLabel?: string
   quantity: number
   unitPrice: number
   currency: string
@@ -22,6 +23,7 @@ function mapItem(doc: CartItemDoc): CartItem {
     sku: doc.sku,
     productSlug: doc.productSlug,
     productName: doc.productName,
+    variantLabel: doc.variantLabel,
     quantity: doc.quantity,
     unitPrice: doc.unitPrice,
     currency: doc.currency,
@@ -47,6 +49,7 @@ export async function addCartItem(
     sku: input.sku,
     productSlug: input.productSlug,
     productName: input.productName,
+    variantLabel: input.variantLabel,
     quantity: input.quantity,
     unitPrice: input.unitPrice,
     currency: input.currency,

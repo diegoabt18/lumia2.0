@@ -20,6 +20,7 @@ const open = computed({
 
 const index = ref(0)
 const zoom = ref(1)
+const canTeleport = ref(false)
 
 watch(
   () => props.startIndex,
@@ -38,10 +39,6 @@ watch(open, (isOpen) => {
   } else {
     document.body.style.overflow = ''
   }
-})
-
-onUnmounted(() => {
-  document.body.style.overflow = ''
 })
 
 function close() {
@@ -86,12 +83,19 @@ function onTouchEnd(e: TouchEvent) {
 const current = computed(() => props.slides[index.value])
 
 onMounted(() => {
+  canTeleport.value = true
   useEventListener(window, 'keydown', onKey)
+})
+
+onBeforeUnmount(() => {
+  canTeleport.value = false
+  open.value = false
+  document.body.style.overflow = ''
 })
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport v-if="canTeleport" to="body">
     <Transition
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="opacity-0"

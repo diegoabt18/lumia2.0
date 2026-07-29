@@ -13,10 +13,18 @@ const props = defineProps<{
 const emit = defineEmits<{
   'add-cart': []
 }>()
+
+const canTeleport = ref(false)
+onMounted(() => {
+  canTeleport.value = true
+})
+onBeforeUnmount(() => {
+  canTeleport.value = false
+})
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport v-if="canTeleport" to="body">
     <Transition
       enter-active-class="transition duration-300 ease-out"
       enter-from-class="translate-y-full opacity-0"
@@ -26,7 +34,7 @@ const emit = defineEmits<{
       leave-to-class="translate-y-full opacity-0"
     >
       <div
-        v-show="visible"
+        v-if="visible"
         class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/10 bg-lumia-canvas/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_32px_rgba(43,43,43,0.08)] backdrop-blur-xl lg:hidden"
       >
         <div class="mx-auto flex max-w-lg items-center gap-3">

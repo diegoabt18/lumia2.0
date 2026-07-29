@@ -136,6 +136,8 @@ export default defineNuxtConfig({
       mpPublicKey: '',
       /** Cloudflare Turnstile site key. */
       turnstileSiteKey: '',
+      /** Umbral COP para barra de envío gratis; 0 = oculta la barra. */
+      storeFreeShippingThreshold: 0,
     },
   },
 })

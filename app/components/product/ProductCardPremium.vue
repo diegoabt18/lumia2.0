@@ -51,11 +51,12 @@
       <button
         type="button"
         class="absolute bottom-2 right-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/45 bg-lumia-ink text-lumia-cream shadow-[0_10px_28px_-8px_rgba(15,15,15,0.45)] transition active:scale-[0.92] disabled:opacity-35 md:hidden"
-        :disabled="!firstSku || isOutOfStock"
+        :disabled="!firstSku || isOutOfStock || quickAddPending"
         :aria-label="'Añadir ' + product.name + ' al carrito'"
         @click.stop="quickAdd"
       >
-        <IconPlus class="h-[18px] w-[18px]" stroke-width="1.35" />
+        <IconLoader2 v-if="quickAddPending" class="h-[18px] w-[18px] animate-spin" stroke-width="1.35" />
+        <IconPlus v-else class="h-[18px] w-[18px]" stroke-width="1.35" />
       </button>
 
       <div
@@ -63,12 +64,13 @@
       >
         <button
           type="button"
-          class="pointer-events-auto inline-flex w-full min-h-[44px] items-center justify-center rounded-xl border border-white/25 bg-lumia-canvas px-4 text-xs font-semibold uppercase tracking-wide text-lumia-ink shadow-soft transition hover:bg-lumia-beige/90 disabled:opacity-40"
-          :disabled="!firstSku || isOutOfStock"
+          class="pointer-events-auto inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/25 bg-lumia-canvas px-4 text-xs font-semibold uppercase tracking-wide text-lumia-ink shadow-soft transition hover:bg-lumia-beige/90 disabled:opacity-40"
+          :disabled="!firstSku || isOutOfStock || quickAddPending"
           @click.stop="quickAdd"
         >
-          <IconPlus class="h-4 w-4" stroke-width="1.35" />
-          Añadir rápido
+          <IconLoader2 v-if="quickAddPending" class="h-4 w-4 animate-spin" stroke-width="1.35" />
+          <IconPlus v-else class="h-4 w-4" stroke-width="1.35" />
+          {{ quickAddPending ? 'Agregando...' : 'Añadir rápido' }}
         </button>
       </div>
     </div>
@@ -115,8 +117,9 @@
 </template>
 
 <script setup lang="ts">
-import { IconPlus } from '@tabler/icons-vue'
+import { IconLoader2, IconPlus } from '@tabler/icons-vue'
 import type { Product, ProductVariant } from '#shared/types/product'
+import { formatVariantLabel } from '#shared/variant-label'
 
 const props = withDefaults(
   defineProps<{
@@ -134,7 +137,8 @@ const props = withDefaults(
 
 const { resolveProductImageSrc, PRODUCT_IMAGE_SIZE_LARGE } = useProductImages()
 const { formatPrice } = useUtils()
-const cart = useCart()
+const { addItem, isAdding } = useCart()
+const toast = useToast()
 const justAdded = ref(false)
 
 const imgSrc = computed(() =>
@@ -226,26 +230,37 @@ const stockRibbon = computed(() => {
   return ''
 })
 
+const quickAddPending = computed(() => {
+  const sku = firstSku.value
+  if (!sku) return false
+  return isAdding({ sku })
+})
+
 async function quickAdd() {
   const sku = firstSku.value
   const v = selectedVariant.value
-  if (!sku || !v || isOutOfStock.value) return
-  const added = await cart.addItem({
-    sku,
-    quantity: 1,
-    product: {
-      productSlug: props.product.slug,
-      productName: props.product.name,
-      unitPrice: v.salePrice ?? v.price,
-      currency: v.currency ?? 'COP',
-      imagePath: props.product.imagePath,
-    },
-  })
-  if (added) {
-    justAdded.value = true
-    setTimeout(() => {
-      justAdded.value = false
-    }, 650)
+  if (!sku || !v || isOutOfStock.value || quickAddPending.value) return
+  try {
+    const added = await addItem({
+      sku,
+      quantity: 1,
+      product: {
+        productSlug: props.product.slug,
+        productName: props.product.name,
+        variantLabel: formatVariantLabel(v.options, v.sku),
+        unitPrice: v.salePrice ?? v.price,
+        currency: v.currency ?? 'COP',
+        imagePath: props.product.imagePath,
+      },
+    })
+    if (added) {
+      justAdded.value = true
+      setTimeout(() => {
+        justAdded.value = false
+      }, 650)
+    }
+  } catch {
+    toast.error('No se pudo añadir al carrito')
   }
 }
 </script>

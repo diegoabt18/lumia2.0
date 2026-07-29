@@ -36,6 +36,13 @@
 
             <div class="mt-5">
               <PdpBadgesRow :sales-badge="product.salesBadge ?? null" />
+              <div
+                v-if="product.averageRating != null && product.reviewsCount"
+                class="mt-3 flex items-center gap-2 text-sm text-lumia-ink/55"
+              >
+                <span class="text-lumia-gold">★ {{ product.averageRating.toFixed(1) }}</span>
+                <span>({{ product.reviewsCount }} reseñas)</span>
+              </div>
             </div>
 
             <div v-if="selectedVariant" class="mt-6 space-y-4">
@@ -45,8 +52,26 @@
                   v-if="priceWasHigher"
                   class="font-display text-xl text-lumia-ink/35 line-through"
                 >{{ formatPrice(displayOriginalPrice, selectedVariant.currency) }}</span>
+                <span
+                  v-if="selectedVariant.promotionPercentOff"
+                  class="rounded-full bg-lumia-gold/25 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-lumia-ink"
+                >
+                  −{{ selectedVariant.promotionPercentOff }}%
+                </span>
               </div>
               <PdpStockBanner :stock="variantStockStatus === 'made_to_order' ? 999 : (selectedVariant?.stock ?? null)" />
+              <div v-if="variantStockStatus === 'made_to_order'" class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                  <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  Fabricación bajo pedido
+                </span>
+              </div>
+              <p
+                v-if="variantStockStatus === 'made_to_order'"
+                class="text-xs leading-relaxed text-lumia-ink/55"
+              >
+                Este producto se prepara especialmente para tu pedido. Los tiempos de entrega pueden ser mayores.
+              </p>
             </div>
             <p v-else-if="product.fromPrice != null" class="mt-6 font-display text-3xl text-lumia-ink">
               Desde {{ formatPrice(product.fromPrice) }}
@@ -71,6 +96,45 @@
               </select>
             </div>
 
+            <div v-if="visibleOptionAxes.length" class="mt-6 space-y-4">
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">
+                Opciones de {{ selectedVariant?.sku ?? 'variante' }}
+              </p>
+              <div v-for="axis in visibleOptionAxes" :key="axis.id" class="space-y-2">
+                <label class="text-xs font-medium text-lumia-ink/55">{{ axis.name }}</label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="val in axis.values"
+                    :key="val.id"
+                    type="button"
+                    class="min-h-11 min-w-[48px] rounded-lg border px-4 py-2.5 text-sm font-medium transition-all duration-150"
+                    :class="
+                      pdpByAxis[axis.id] === val.id
+                        ? 'border-lumia-ink bg-lumia-ink text-white shadow-sm'
+                        : 'border-lumia-ink/15 bg-white text-lumia-ink/70 hover:border-lumia-ink/30 hover:text-lumia-ink'
+                    "
+                    :aria-pressed="pdpByAxis[axis.id] === val.id"
+                    @click="selectOptionValue(axis.id, val.id)"
+                  >
+                    {{ val.value }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="product.optionsFormat === 'legacy' && legacyOptionEntries.length"
+              class="mt-10 space-y-3"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">Opciones</p>
+              <dl class="space-y-2 text-sm text-lumia-ink/80">
+                <div v-for="row in legacyOptionEntries" :key="row[0]" class="flex flex-wrap gap-2">
+                  <dt class="text-lumia-ink/50">{{ row[0] }}</dt>
+                  <dd class="font-medium text-lumia-ink">{{ row[1] }}</dd>
+                </div>
+              </dl>
+            </div>
+
             <div class="mt-10 flex flex-wrap items-center gap-4">
               <span class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">Cantidad</span>
               <PdpQuantityStepper v-model="quantity" :max="maxQty" :disabled="!selectedVariant || maxQty < 1" />
@@ -85,6 +149,7 @@
                 @click="addToCart"
               >
                 <span v-if="addToCartPending">Agregando...</span>
+                <span v-else-if="variantStockStatus === 'made_to_order'">Agregar bajo pedido</span>
                 <span v-else-if="variantStockStatus === 'out_of_stock'">Sin stock</span>
                 <span v-else>Añadir al carrito</span>
               </BaseButton>
@@ -92,6 +157,13 @@
             </div>
           </div>
         </div>
+
+        <ProductReviewsSection
+          v-if="product"
+          :slug="product.slug"
+          :initial-average="product.averageRating ?? null"
+          :initial-count="product.reviewsCount ?? null"
+        />
 
         <section v-if="related.length" class="mt-20">
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">También te puede gustar</p>
@@ -110,6 +182,7 @@
       :variant-label="stickyVariantLabel"
       :add-disabled="!selectedVariant || variantStockStatus === 'out_of_stock'"
       :add-pending="addToCartPending"
+      :add-label="variantStockStatus === 'made_to_order' ? 'Agregar bajo pedido' : undefined"
       @add-cart="addToCart"
     />
   </div>
@@ -138,7 +211,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Product, ProductVariant } from '#shared/types/product'
+import type { Product, ProductOptionAxisDTO, ProductVariant } from '#shared/types/product'
+import { formatVariantLabel } from '#shared/variant-label'
 import { useMediaQuery, useWindowScroll } from '@vueuse/core'
 
 const route = useRoute()
@@ -188,14 +262,90 @@ const maxQty = computed(() => {
 const variantStockStatus = computed<'in_stock' | 'made_to_order' | 'out_of_stock'>(() => {
   const v = selectedVariant.value
   if (!v) return 'out_of_stock'
+  if (v.isMadeToOrder) return 'made_to_order'
   const stock = v.stock ?? v.available ?? 0
   if (stock > 0) return 'in_stock'
   return 'out_of_stock'
 })
 
+const visibleOptionAxes = computed<ProductOptionAxisDTO[]>(() => {
+  const p = product.value
+  const v = selectedVariant.value
+  if (!p?.optionAxes?.length || !v?.optionRules?.length) return []
+  const ruleMap = new Map(v.optionRules.map((r) => [r.optionId, new Set(r.allowedValueIds)]))
+  return p.optionAxes
+    .filter((axis) => ruleMap.has(axis.id))
+    .map((axis) => ({
+      ...axis,
+      values: axis.values.filter((val) => ruleMap.get(axis.id)?.has(val.id)),
+    }))
+    .filter((axis) => axis.values.length > 0)
+})
+
+const pdpByAxis = reactive<Record<string, string>>({})
+
+function selectOptionValue(axisId: string, valueId: string) {
+  if (pdpByAxis[axisId] === valueId) return
+  const currentVariant = selectedVariant.value
+  if (currentVariant?.optionRules) {
+    const rule = currentVariant.optionRules.find((r) => r.optionId === axisId)
+    if (rule?.allowedValueIds.includes(valueId)) {
+      pdpByAxis[axisId] = valueId
+      return
+    }
+  }
+  const variants = product.value?.variants ?? []
+  const selectedOthers = Object.entries(pdpByAxis).filter(([k, v]) => k !== axisId && Boolean(v))
+  for (const v of variants) {
+    if (v.sku === currentVariant?.sku) continue
+    if (!v.optionRules?.length) continue
+    const ruleMap = new Map(v.optionRules.map((r) => [r.optionId, new Set(r.allowedValueIds)]))
+    if (!ruleMap.get(axisId)?.has(valueId)) continue
+    const othersMatch = selectedOthers.every(([aId, vId]) => ruleMap.get(aId)?.has(vId))
+    if (othersMatch) {
+      pdpByAxis[axisId] = valueId
+      selectedSku.value = v.sku
+      return
+    }
+  }
+  const candidates = variants.filter((v) => {
+    if (v.sku === currentVariant?.sku) return false
+    return v.optionRules?.some((r) => r.optionId === axisId && r.allowedValueIds.includes(valueId))
+  })
+  if (candidates.length) {
+    pdpByAxis[axisId] = valueId
+    for (const ax of visibleOptionAxes.value) {
+      if (ax.id !== axisId) pdpByAxis[ax.id] = ax.values[0]?.id ?? ''
+    }
+    selectedSku.value = candidates[0]!.sku
+  }
+}
+
+const legacyOptionEntries = computed(() => {
+  const v = selectedVariant.value
+  if (!v?.options || !Object.keys(v.options).length) return [] as [string, string][]
+  return Object.entries(v.options) as [string, string][]
+})
+
+watch(
+  () => selectedVariant.value?.sku,
+  () => {
+    const axes = visibleOptionAxes.value
+    for (const axis of axes) {
+      const first = axis.values[0]
+      if (first && !pdpByAxis[axis.id]) pdpByAxis[axis.id] = first.id
+    }
+  },
+  { immediate: true }
+)
+
 const quantity = ref(1)
 const lightboxOpen = ref(false)
 const lightboxStartIndex = ref(0)
+
+onBeforeRouteLeave(() => {
+  lightboxOpen.value = false
+})
 
 const isMobileLayout = useMediaQuery('(max-width: 1023px)')
 const { y: scrollY } = useWindowScroll()
@@ -253,8 +403,7 @@ watch(
 function variantSelectLabel(v: ProductVariant) {
   const unit = v.salePrice ?? v.price
   const price = formatPrice(unit, v.currency)
-  const opts = Object.values(v.options ?? {}).join(' · ')
-  return opts ? `${opts} — ${price}` : `${v.sku} — ${price}`
+  return `${v.sku} — ${price}`
 }
 
 function openLightbox(i: number) {
@@ -270,14 +419,14 @@ async function addToCart() {
     product: {
       productSlug: product.value.slug,
       productName: product.value.name,
+      variantLabel: formatVariantLabel(selectedVariant.value.options, selectedVariant.value.sku),
       unitPrice: displaySalePrice.value,
       currency: selectedVariant.value.currency ?? 'COP',
       imagePath: catalogImagePath.value,
     },
   }
   try {
-    const added = await addItem(payload)
-    if (added) toast.success(`"${product.value.name}" agregado al carrito`)
+    await addItem(payload)
   } catch {
     toast.error('Error agregando producto al carrito')
   }

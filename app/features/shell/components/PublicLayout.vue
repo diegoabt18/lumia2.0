@@ -11,4 +11,9 @@
 
 <script setup lang="ts">
 const cartOpen = ref(false)
+const { fetchCart } = useCart()
+
+onMounted(() => {
+  void fetchCart()
+})
 </script>

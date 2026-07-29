@@ -21,7 +21,17 @@ const props = defineProps<{
 }>()
 
 const config = useRuntimeConfig()
-const phone = computed(() => props.whatsappPhone || config.public.whatsappPhone?.trim() || '')
+
+function normalizeWhatsAppPhone(value: unknown): string {
+  if (value == null || value === '') return ''
+  return String(value).trim()
+}
+
+const phone = computed(() => {
+  const fromProp = normalizeWhatsAppPhone(props.whatsappPhone)
+  if (fromProp) return fromProp
+  return normalizeWhatsAppPhone(config.public.whatsappPhone)
+})
 const hasWhatsApp = computed(() => Boolean(phone.value))
 
 function onSendWhatsApp() {

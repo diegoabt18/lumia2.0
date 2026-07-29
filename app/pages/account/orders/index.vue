@@ -2,12 +2,18 @@
   <BaseContainer class="py-16">
     <h1 class="font-display text-3xl text-lumia-ink">Mis pedidos</h1>
 
-    <div v-if="!user" class="mt-8 rounded-2xl border border-lumia-ink/8 bg-white/70 p-6">
+    <div v-if="!authLoaded" class="mt-10 space-y-4">
+      <div v-for="n in 3" :key="n" class="h-24 animate-pulse rounded-2xl bg-lumia-beige/50" />
+    </div>
+
+    <div v-else-if="!user" class="mt-8 rounded-2xl border border-lumia-ink/8 bg-white/70 p-6">
       <p class="text-lumia-ink/60">Inicia sesión para ver el historial de tus pedidos.</p>
       <BaseButton to="/auth/login?redirect=/account/orders" variant="primary" class="mt-6">Entrar</BaseButton>
     </div>
 
-    <div v-else-if="pending" class="mt-10 text-sm text-lumia-ink/45">Cargando pedidos…</div>
+    <div v-else-if="pending" class="mt-10 space-y-4">
+      <div v-for="n in 3" :key="n" class="h-24 animate-pulse rounded-2xl bg-lumia-beige/50" />
+    </div>
 
     <div v-else-if="!orders.length" class="mt-10 rounded-2xl border border-dashed border-lumia-ink/15 bg-lumia-cream/40 p-10 text-center">
       <p class="text-lumia-ink/70">Aún no tienes pedidos.</p>
@@ -31,7 +37,10 @@
           </div>
         </div>
         <div class="mt-4 flex flex-wrap gap-3">
-          <BaseButton :to="`/thank-you/${encodeURIComponent(order.orderNumber)}`" variant="ghost">
+          <BaseButton
+            :to="`/thank-you/${encodeURIComponent(order.orderNumber)}?view=history`"
+            variant="ghost"
+          >
             Ver detalle
           </BaseButton>
         </div>
@@ -43,14 +52,24 @@
 <script setup lang="ts">
 import type { OrderSummary } from '#shared/types/order'
 
-const { user } = useAuth()
+const { user, loaded: authLoaded } = useAuth()
 const { formatPrice, formatStoreDate } = useUtils()
 
-const { data, pending } = await useAsyncData('account-orders', () =>
-  $fetch<{ orders: OrderSummary[] }>('/api/orders/mine').catch(() => ({ orders: [] }))
+const { data, pending, refresh } = useAsyncData(
+  'account-orders',
+  () => $fetch<{ orders: OrderSummary[] }>('/api/orders/mine'),
+  { immediate: false, server: false }
 )
 
 const orders = computed(() => data.value?.orders ?? [])
+
+watch(
+  [user, authLoaded],
+  ([u, loaded]) => {
+    if (loaded && u) void refresh()
+  },
+  { immediate: true }
+)
 
 function statusLabel(status: string) {
   if (status === 'pending_manual') return 'Pago pendiente'

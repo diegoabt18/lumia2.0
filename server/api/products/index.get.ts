@@ -6,11 +6,15 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20))
   const skip = (page - 1) * limit
   const search = typeof query.search === 'string' ? query.search : undefined
+  const categoryRaw = typeof query.category === 'string' ? query.category : undefined
+  const categorySlugs = categoryRaw
+    ? categoryRaw.split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined
 
   try {
     const [products, total] = await Promise.all([
-      listProducts({ limit, skip, search }),
-      countProducts(search),
+      listProducts({ limit, skip, search, categorySlugs }),
+      countProducts(search, categorySlugs),
     ])
 
     const totalPages = Math.max(1, Math.ceil(total / limit))

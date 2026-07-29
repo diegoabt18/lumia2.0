@@ -7,6 +7,7 @@ export interface OrderItemDoc {
   sku: string
   productSlug?: string
   name: string
+  variantLabel?: string
   quantity: number
   unitPrice: number
   subtotal: number
@@ -64,6 +65,7 @@ function mapItems(cartItems: CartItemDoc[]): OrderItemDoc[] {
     sku: i.sku,
     productSlug: i.productSlug,
     name: i.productName,
+    variantLabel: i.variantLabel,
     quantity: i.quantity,
     unitPrice: i.unitPrice,
     subtotal: i.unitPrice * i.quantity,
@@ -169,6 +171,7 @@ export function toPublicOrder(order: OrderDoc) {
     items: order.items.map((i) => ({
       sku: i.sku,
       name: i.name,
+      variantLabel: i.variantLabel,
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       subtotal: i.subtotal,

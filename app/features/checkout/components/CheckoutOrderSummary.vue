@@ -3,7 +3,10 @@
     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">Resumen</p>
     <ul class="mt-4 space-y-3">
       <li v-for="item in items" :key="item.sku" class="flex justify-between gap-3 text-sm">
-        <span class="min-w-0 truncate text-lumia-ink/75">{{ item.productName }} × {{ item.quantity }}</span>
+        <span class="min-w-0">
+          <span class="block truncate text-lumia-ink/75">{{ item.productName }} × {{ item.quantity }}</span>
+          <span v-if="item.variantLabel" class="mt-0.5 block truncate text-xs text-lumia-ink/50">{{ item.variantLabel }}</span>
+        </span>
         <span class="shrink-0 tabular-nums text-lumia-ink">{{ formatPrice(item.unitPrice * item.quantity, item.currency) }}</span>
       </li>
     </ul>
