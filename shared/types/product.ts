@@ -67,4 +67,8 @@ export interface CartItem {
   unitPrice: number
   currency: string
   imagePath?: string | null
+  /** Precio base antes de promo (solo lectura, enriquecido en API). */
+  originalUnitPrice?: number
+  promotionPercentOff?: number
+  promotionLabel?: string
 }

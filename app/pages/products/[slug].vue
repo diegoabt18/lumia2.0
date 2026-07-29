@@ -27,22 +27,44 @@
           </div>
 
           <div class="flex flex-col duration-500">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">LUMIA</p>
-              <h1 class="mt-3 font-display text-4xl font-medium leading-tight text-lumia-ink md:text-5xl">
-                {{ product.name }}
-              </h1>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">LUMIA</p>
+                <h1 class="mt-3 font-display text-4xl font-medium leading-tight text-lumia-ink md:text-5xl">
+                  {{ product.name }}
+                </h1>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 rounded-full border border-lumia-ink/10 bg-white p-3 shadow-soft transition hover:border-lumia-gold/35 hover:shadow-soft-lg"
+                :aria-pressed="favorited"
+                :aria-busy="wishPending"
+                aria-label="Favoritos"
+                @click="onToggleWishlist"
+              >
+                <IconHeart
+                  class="h-6 w-6 stroke-[1.25] transition-colors"
+                  :class="favorited ? 'fill-lumia-gold text-lumia-gold' : 'text-lumia-ink/55'"
+                />
+              </button>
             </div>
 
             <div class="mt-5">
               <PdpBadgesRow :sales-badge="product.salesBadge ?? null" />
-              <div
+              <a
                 v-if="product.averageRating != null && product.reviewsCount"
-                class="mt-3 flex items-center gap-2 text-sm text-lumia-ink/55"
+                href="#opiniones"
+                class="mt-4 inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-full border border-lumia-ink/8 bg-white/70 px-4 py-2.5 shadow-soft transition hover:border-lumia-gold/35 hover:bg-white"
               >
-                <span class="text-lumia-gold">★ {{ product.averageRating.toFixed(1) }}</span>
-                <span>({{ product.reviewsCount }} reseñas)</span>
-              </div>
+                <span class="flex items-center gap-0.5 text-lumia-gold" aria-hidden="true">
+                  <span v-for="n in 5" :key="n" class="text-base leading-none">{{ ratingStarChar(n) }}</span>
+                </span>
+                <span class="font-display text-base font-semibold tabular-nums text-lumia-ink md:text-lg">
+                  {{ product.averageRating.toFixed(1) }}
+                </span>
+                <span class="hidden h-4 w-px bg-lumia-ink/15 sm:block" aria-hidden="true" />
+                <span class="text-sm font-medium text-lumia-ink/55">{{ reviewsCountLabel }}</span>
+              </a>
             </div>
 
             <div v-if="selectedVariant" class="mt-6 space-y-4">
@@ -153,6 +175,17 @@
                 <span v-else-if="variantStockStatus === 'out_of_stock'">Sin stock</span>
                 <span v-else>Añadir al carrito</span>
               </BaseButton>
+              <BaseButton
+                type="button"
+                variant="secondary"
+                class="min-h-[48px] sm:min-w-[200px]"
+                :disabled="!selectedVariant || buyNowPending || variantStockStatus === 'out_of_stock'"
+                :aria-busy="buyNowPending"
+                @click="buyNow"
+              >
+                <span v-if="buyNowPending">Redirigiendo...</span>
+                <span v-else>Comprar ahora</span>
+              </BaseButton>
               <BaseButton to="/products" variant="ghost">Seguir comprando</BaseButton>
             </div>
           </div>
@@ -182,8 +215,10 @@
       :variant-label="stickyVariantLabel"
       :add-disabled="!selectedVariant || variantStockStatus === 'out_of_stock'"
       :add-pending="addToCartPending"
+      :buy-pending="buyNowPending"
       :add-label="variantStockStatus === 'made_to_order' ? 'Agregar bajo pedido' : undefined"
       @add-cart="addToCart"
+      @buy-now="buyNow"
     />
   </div>
 
@@ -213,6 +248,7 @@
 <script setup lang="ts">
 import type { Product, ProductOptionAxisDTO, ProductVariant } from '#shared/types/product'
 import { formatVariantLabel } from '#shared/variant-label'
+import { IconHeart } from '@tabler/icons-vue'
 import { useMediaQuery, useWindowScroll } from '@vueuse/core'
 
 const route = useRoute()
@@ -228,7 +264,8 @@ const { fetchProducts } = useCatalog()
 
 const { data: relatedData } = await useAsyncData(
   () => `pdp-related-${slugParam.value}`,
-  () => fetchProducts({ limit: 12 })
+  () => fetchProducts({ limit: 4, page: 1 }),
+  { lazy: true }
 )
 
 const product = computed(() => detailData.value?.product ?? null)
@@ -237,6 +274,11 @@ const { addItem, isAdding } = useCart()
 const { formatPrice } = useUtils()
 const { resolveProductImageSrc } = useProductImages()
 const toast = useToast()
+
+const slugRef = computed(() => product.value?.slug ?? '')
+const { favorited, pending: wishPending, toggle: toggleWishlist } = useProductWishlist(slugRef)
+
+const buyNowPending = ref(false)
 
 const selectedSku = ref('')
 
@@ -252,6 +294,17 @@ const displayOriginalPrice = computed(() => selectedVariant.value?.compareAtPric
 const priceWasHigher = computed(
   () => displayOriginalPrice.value > displaySalePrice.value && displaySalePrice.value > 0
 )
+
+const reviewsCountLabel = computed(() => {
+  const n = product.value?.reviewsCount ?? 0
+  if (n === 1) return '1 reseña'
+  return `${n} reseñas`
+})
+
+function ratingStarChar(n: number) {
+  const avg = product.value?.averageRating ?? 0
+  return n <= Math.round(avg) ? '★' : '☆'
+}
 
 const maxQty = computed(() => {
   const s = selectedVariant.value?.stock ?? selectedVariant.value?.available
@@ -351,7 +404,6 @@ const isMobileLayout = useMediaQuery('(max-width: 1023px)')
 const { y: scrollY } = useWindowScroll()
 
 const catalogImagePath = computed(() => selectedVariant.value?.imagePath ?? product.value?.imagePath ?? '')
-const slugRef = computed(() => product.value?.slug ?? '')
 const { slides: gallerySlides, probing: galleryProbing } = usePdpGallerySlides(slugRef, catalogImagePath)
 
 const stickyVisible = computed(() => Boolean(product.value && isMobileLayout.value && scrollY.value > 200))
@@ -411,6 +463,16 @@ function openLightbox(i: number) {
   lightboxOpen.value = true
 }
 
+async function onToggleWishlist() {
+  const result = await toggleWishlist()
+  if (result === null) return
+  if (result) {
+    toast.success(useAuth().user.value ? 'Añadido a favoritos' : 'Guardado en favoritos (este dispositivo)')
+  } else {
+    toast.info('Quitado de favoritos')
+  }
+}
+
 async function addToCart() {
   if (!selectedVariant.value || !product.value) return
   const payload = {
@@ -429,6 +491,31 @@ async function addToCart() {
     await addItem(payload)
   } catch {
     toast.error('Error agregando producto al carrito')
+  }
+}
+
+async function buyNow() {
+  if (!selectedVariant.value || !product.value) return
+  buyNowPending.value = true
+  try {
+    const payload = {
+      sku: selectedVariant.value.sku,
+      quantity: quantity.value,
+      product: {
+        productSlug: product.value.slug,
+        productName: product.value.name,
+        variantLabel: formatVariantLabel(selectedVariant.value.options, selectedVariant.value.sku),
+        unitPrice: displaySalePrice.value,
+        currency: selectedVariant.value.currency ?? 'COP',
+        imagePath: catalogImagePath.value,
+      },
+    }
+    const added = await addItem(payload)
+    if (added) await navigateTo('/checkout')
+  } catch {
+    toast.error('No se pudo continuar al checkout')
+  } finally {
+    buyNowPending.value = false
   }
 }
 

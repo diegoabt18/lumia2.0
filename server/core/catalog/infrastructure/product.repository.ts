@@ -67,10 +67,42 @@ const VARIANTS_LOOKUP = {
   },
 } as const
 
-function searchFilter(search?: string, categorySlugs?: string[]): Record<string, unknown> {
+/** Listado catálogo: sin join de inventario (mucho más rápido en Workers). */
+const VARIANTS_LOOKUP_LIGHT = {
+  $lookup: {
+    from: 'variants',
+    let: { productSlug: '$slug' },
+    pipeline: [
+      { $match: { $expr: { $eq: ['$product_slug', '$$productSlug'] } } },
+      { $sort: { price: 1 } },
+      { $limit: 4 },
+      {
+        $project: {
+          sku: 1,
+          product_slug: 1,
+          price: 1,
+          compare_at_price: 1,
+          currency: 1,
+          options: 1,
+          image_path: 1,
+          stock: 1,
+          available: 1,
+        },
+      },
+    ],
+    as: 'variants',
+  },
+} as const
+
+function searchFilter(
+  search?: string,
+  categorySlugs?: string[],
+  productSlugs?: string[]
+): Record<string, unknown> {
   const s = search?.trim()
   const base: Record<string, unknown> = { status: { $ne: 'inactive' } }
   if (categorySlugs?.length) base.category_slug = { $in: categorySlugs }
+  if (productSlugs?.length) base.slug = { $in: productSlugs }
   if (!s) return base
   return {
     ...base,
@@ -181,40 +213,65 @@ export async function listProducts(options: {
   search?: string
   categorySlugs?: string[]
 }): Promise<Product[]> {
+  const { products } = await listProductsPage(options)
+  return products
+}
+
+export async function listProductsPage(options: {
+  limit?: number
+  skip?: number
+  search?: string
+  categorySlugs?: string[]
+  productSlugs?: string[]
+}): Promise<{ products: Product[]; total: number }> {
   const { getCatalogDb } = await import('../../../database/catalog')
   const { findActivePromotionsCached } = await import('../../../utils/active-promotions-cache')
+  const { findTopSellingSlugsCached } = await import('../../../utils/top-selling-cache')
   const { applyPromotionsToProduct } = await import('../../pricing/apply-product-promotions')
   const db = await getCatalogDb()
   const limit = Math.min(options.limit ?? 20, 100)
   const skip = options.skip ?? 0
+  const match = searchFilter(options.search, options.categorySlugs, options.productSlugs)
 
-  const [rows, topSlugs, promotions] = await Promise.all([
+  const [facetRows, topSlugs, promotions] = await Promise.all([
     db
       .collection<ProductDoc>('products')
       .aggregate([
-        { $match: searchFilter(options.search, options.categorySlugs) },
-        { $sort: { created_at: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-        VARIANTS_LOOKUP,
+        { $match: match },
+        {
+          $facet: {
+            rows: [
+              { $sort: { created_at: -1 } },
+              { $skip: skip },
+              { $limit: limit },
+              VARIANTS_LOOKUP_LIGHT,
+            ],
+            total: [{ $count: 'n' }],
+          },
+        },
       ])
       .toArray(),
-    findTopSellingSlugs(8),
+    findTopSellingSlugsCached(8),
     findActivePromotionsCached(),
   ])
 
+  const facet = facetRows[0] as { rows?: Array<ProductDoc & { variants?: VariantDoc[] }>; total?: Array<{ n: number }> }
+  const rows = facet?.rows ?? []
+  const total = facet?.total?.[0]?.n ?? 0
   const topSet = new Set(topSlugs)
   const now = new Date()
 
-  return rows.map((row) => {
-    let product = mapProduct(row as ProductDoc, (row as { variants?: VariantDoc[] }).variants ?? [])
+  const products = rows.map((row) => {
+    let product = mapProduct(row, row.variants ?? [])
     product = applyPromotionsToProduct(product, promotions, now)
     if (topSet.has(product.slug)) product.salesBadge = 'bestseller'
-    else if ((row as ProductDoc).sales_total_units != null && (row as ProductDoc).sales_total_units! >= 3) {
+    else if (row.sales_total_units != null && row.sales_total_units >= 3) {
       product.salesBadge = 'popular'
     }
     return product
   })
+
+  return { products, total }
 }
 
 export async function countProducts(search?: string, categorySlugs?: string[]): Promise<number> {
@@ -226,6 +283,7 @@ export async function countProducts(search?: string, categorySlugs?: string[]): 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   const { getCatalogDb } = await import('../../../database/catalog')
   const { findActivePromotionsCached } = await import('../../../utils/active-promotions-cache')
+  const { findTopSellingSlugsCached } = await import('../../../utils/top-selling-cache')
   const { applyPromotionsToProduct } = await import('../../pricing/apply-product-promotions')
   const db = await getCatalogDb()
 
@@ -238,7 +296,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         VARIANTS_LOOKUP,
       ])
       .toArray(),
-    findTopSellingSlugs(8),
+    findTopSellingSlugsCached(8),
     findActivePromotionsCached(),
   ])
 
@@ -255,17 +313,4 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     product.salesBadge = 'popular'
   }
   return product
-}
-
-async function findTopSellingSlugs(limit: number): Promise<string[]> {
-  const { getCatalogDb } = await import('../../../database/catalog')
-  const db = await getCatalogDb()
-  const rows = await db
-    .collection<ProductDoc>('products')
-    .find({ status: { $ne: 'inactive' } })
-    .sort({ sales_total_units: -1 })
-    .limit(Math.max(1, limit))
-    .project({ slug: 1 })
-    .toArray()
-  return rows.map((r) => r.slug).filter(Boolean)
 }

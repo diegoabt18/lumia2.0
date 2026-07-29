@@ -18,10 +18,18 @@
           Velas artesanales, luz cálida y aromas que convierten tu hogar en un refugio.
         </p>
         <div class="mt-10 flex flex-wrap gap-4">
-          <BaseButton to="/products" variant="primary">Explorar colección</BaseButton>
+          <BaseButton type="button" variant="primary" @click="scrollToCollections">
+            Explorar colecciones
+          </BaseButton>
           <BaseButton to="/products" variant="secondary">Ver velas</BaseButton>
         </div>
       </div>
     </BaseContainer>
   </section>
 </template>
+
+<script setup lang="ts">
+function scrollToCollections() {
+  document.getElementById('colecciones')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+</script>

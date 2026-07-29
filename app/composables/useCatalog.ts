@@ -24,7 +24,13 @@ function paginateMock(page: number, limit: number) {
  * Catálogo con fallback automático a mocks si MongoDB no está configurado o falla.
  */
 export function useCatalog() {
-  async function fetchProducts(query: { limit?: number; page?: number; search?: string; category?: string } = {}) {
+  async function fetchProducts(query: {
+    limit?: number
+    page?: number
+    search?: string
+    category?: string
+    slugs?: string
+  } = {}) {
     const page = Math.max(1, query.page ?? 1)
     const limit = Math.max(1, query.limit ?? 12)
 
@@ -35,6 +41,7 @@ export function useCatalog() {
           page,
           search: query.search,
           category: query.category,
+          slugs: query.slugs,
         },
       })
       const list = res.products?.length ? res.products : res.items ?? []
@@ -49,6 +56,15 @@ export function useCatalog() {
         },
       }
     } catch {
+      if (query.slugs) {
+        const slugSet = new Set(query.slugs.split(',').map((s) => s.trim()).filter(Boolean))
+        const list = MOCK_PRODUCTS.filter((p) => slugSet.has(p.slug))
+        return {
+          products: list,
+          source: 'mock' as const,
+          pagination: { page: 1, limit: list.length, total: list.length, totalPages: 1 },
+        }
+      }
       return paginateMock(page, limit)
     }
   }

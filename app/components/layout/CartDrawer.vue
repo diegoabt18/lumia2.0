@@ -131,8 +131,15 @@
                           </div>
 
                           <div class="text-right">
+                            <p
+                              v-if="item.originalUnitPrice && item.originalUnitPrice > item.unitPrice"
+                              class="text-[10px] font-medium text-lumia-ink/35 line-through"
+                            >
+                              {{ formatPrice(item.originalUnitPrice, item.currency) }}
+                            </p>
                             <p class="text-[11px] font-medium uppercase tracking-wide text-lumia-ink/38">
                               {{ formatPrice(item.unitPrice, item.currency) }} c/u
+                              <span v-if="item.promotionPercentOff" class="ml-1 text-lumia-gold">−{{ item.promotionPercentOff }}%</span>
                             </p>
                             <p class="font-display text-[17px] font-semibold tabular-nums text-lumia-ink">
                               {{ formatPrice(item.unitPrice * item.quantity, item.currency) }}

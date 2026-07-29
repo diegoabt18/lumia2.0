@@ -1,7 +1,7 @@
 <template>
   <div>
     <HomeHero />
-    <HomeFeaturedProducts :items="featured" :loading="pending" />
+    <HomeFeaturedProducts :items="featuredItems" :loading="featuredPending" />
     <HomeCategoryGrid />
     <HomeBrandStory />
     <HomeBenefits />
@@ -12,6 +12,9 @@
 </template>
 
 <script setup lang="ts">
+import type { Product } from '#shared/types/product'
+import { useCategoryStore } from '~/features/category/stores/category'
+
 useHead({
   title: 'LUMIA — Velas artesanales',
   meta: [
@@ -23,10 +26,20 @@ useHead({
 })
 
 const catalog = useCatalog()
+const categoryStore = useCategoryStore()
 
-const { data, pending } = await useAsyncData('home-featured', () =>
+const { data: featuredData, pending: featuredPending } = await useAsyncData('home-featured', () =>
   catalog.fetchProducts({ limit: 6, page: 1 })
 )
 
-const featured = computed(() => data.value?.products.slice(0, 6) ?? [])
+await useAsyncData('home-categories', async () => {
+  const res = await $fetch<{ categories: Parameters<typeof categoryStore.hydrate>[0] }>('/api/categories')
+  if (res.categories?.length) categoryStore.hydrate(res.categories)
+  return res.categories
+})
+
+const featuredItems = computed((): Product[] => {
+  const list = featuredData.value?.products
+  return Array.isArray(list) ? list.slice(0, 6) : []
+})
 </script>

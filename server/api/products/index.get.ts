@@ -1,4 +1,5 @@
-import { listProducts, countProducts } from '../../core/catalog/infrastructure/product.repository'
+import { listProductsPage } from '../../core/catalog/infrastructure/product.repository'
+import { setPublicCacheHeaders } from '../../utils/memory-cache'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -10,14 +11,16 @@ export default defineEventHandler(async (event) => {
   const categorySlugs = categoryRaw
     ? categoryRaw.split(',').map((s) => s.trim()).filter(Boolean)
     : undefined
+  const slugsRaw = typeof query.slugs === 'string' ? query.slugs : undefined
+  const productSlugs = slugsRaw
+    ? slugsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 30)
+    : undefined
 
   try {
-    const [products, total] = await Promise.all([
-      listProducts({ limit, skip, search, categorySlugs }),
-      countProducts(search, categorySlugs),
-    ])
-
+    const { products, total } = await listProductsPage({ limit, skip, search, categorySlugs, productSlugs })
     const totalPages = Math.max(1, Math.ceil(total / limit))
+
+    setPublicCacheHeaders(event, 45)
 
     return {
       products,

@@ -8,10 +8,12 @@ const props = defineProps<{
   addDisabled?: boolean
   addPending?: boolean
   addLabel?: string
+  buyPending?: boolean
 }>()
 
 const emit = defineEmits<{
   'add-cart': []
+  'buy-now': []
 }>()
 
 const canTeleport = ref(false)
@@ -44,16 +46,27 @@ onBeforeUnmount(() => {
             <p class="truncate text-xs text-lumia-ink/50">{{ variantLabel }}</p>
             <p class="font-display text-base text-lumia-ink">{{ priceLabel }}</p>
           </div>
-          <button
-            type="button"
-            class="min-h-11 shrink-0 rounded-xl bg-lumia-ink px-5 py-3 text-xs font-semibold uppercase tracking-wide text-lumia-cream transition hover:bg-lumia-ink/90 disabled:opacity-40"
-            :disabled="addDisabled || addPending"
-            @click="emit('add-cart')"
-          >
-            <span v-if="addPending" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-lumia-cream border-t-transparent" />
-            <span v-else-if="addLabel">{{ addLabel }}</span>
-            <span v-else>Añadir</span>
-          </button>
+          <div class="flex shrink-0 flex-col gap-2">
+            <button
+              type="button"
+              class="min-h-11 rounded-xl bg-lumia-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-lumia-cream transition hover:bg-lumia-ink/90 disabled:opacity-40"
+              :disabled="addDisabled || addPending || buyPending"
+              @click="emit('add-cart')"
+            >
+              <span v-if="addPending" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-lumia-cream border-t-transparent" />
+              <span v-else-if="addLabel">{{ addLabel }}</span>
+              <span v-else>Añadir</span>
+            </button>
+            <button
+              type="button"
+              class="min-h-9 rounded-xl border border-lumia-ink/15 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-lumia-ink transition hover:bg-lumia-cream/50 disabled:opacity-40"
+              :disabled="addDisabled || addPending || buyPending"
+              @click="emit('buy-now')"
+            >
+              <span v-if="buyPending" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-lumia-ink border-t-transparent" />
+              <span v-else>Comprar</span>
+            </button>
+          </div>
         </div>
       </div>
     </Transition>

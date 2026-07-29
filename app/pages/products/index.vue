@@ -41,6 +41,18 @@
         </div>
         <div class="-mx-1 mt-2.5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
+            type="button"
+            class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-wide transition"
+            :class="
+              favoritesOnly
+                ? 'border-lumia-gold bg-lumia-gold/15 text-lumia-ink'
+                : 'border-lumia-ink/12 bg-lumia-cream/50 text-lumia-ink/75'
+            "
+            @click="toggleFavoritesOnly"
+          >
+            ♥ Favoritos{{ wishlistCount ? ` (${wishlistCount})` : '' }}
+          </button>
+          <button
             v-for="cat in categories"
             :key="'chip-' + cat.slug"
             type="button"
@@ -61,7 +73,9 @@
         <ProductFiltersSidebar
           v-model:selected-categories="selectedCategories"
           v-model:promo-only="promoOnly"
+          v-model:favorites-only="favoritesOnly"
           :categories="categories"
+          :favorites-count="wishlistCount"
           :has-active-filters="hasActiveFilters"
           class="hidden lg:block lg:sticky lg:top-24 lg:w-full lg:max-w-[280px] lg:shrink-0 lg:self-start"
           @clear="clearFilters"
@@ -120,11 +134,16 @@
           </div>
 
           <div v-else class="rounded-2xl border border-dashed border-lumia-ink/15 bg-lumia-cream/40 px-8 py-16 text-center">
-            <p class="font-display text-xl text-lumia-ink/70">No hay productos con estos filtros</p>
+            <p class="font-display text-xl text-lumia-ink/70">
+              {{ favoritesOnly && !wishlistCount ? 'Aún no tienes favoritos guardados' : 'No hay productos con estos filtros' }}
+            </p>
+            <p v-if="favoritesOnly && !wishlistCount" class="mt-2 text-sm text-lumia-ink/50">
+              Marca productos con el corazón para verlos aquí.
+            </p>
             <BaseButton type="button" variant="ghost" class="mt-6" @click="clearFilters">Quitar filtros</BaseButton>
           </div>
 
-          <div v-if="pagination && pagination.total > 0" class="mt-10 border-t border-lumia-ink/8 pt-8">
+          <div v-if="pagination && pagination.total > 0 && !favoritesOnly" class="mt-10 border-t border-lumia-ink/8 pt-8">
             <AppPagination
               :page="page"
               :pages="pagination.totalPages"
@@ -143,6 +162,10 @@
               El filtro de ofertas aplica solo a los productos de esta página.
             </p>
           </div>
+
+          <p v-if="favoritesOnly && wishlistCount && filteredProducts.length" class="mt-6 text-center text-xs text-lumia-ink/45">
+            Mostrando {{ filteredProducts.length }} de {{ wishlistCount }} favoritos.
+          </p>
         </div>
       </div>
 
@@ -158,7 +181,9 @@
               <ProductFiltersSidebar
                 v-model:selected-categories="selectedCategories"
                 v-model:promo-only="promoOnly"
+                v-model:favorites-only="favoritesOnly"
                 :categories="categories"
+                :favorites-count="wishlistCount"
                 :has-active-filters="hasActiveFilters"
                 class="border-0 bg-transparent p-0 shadow-none"
                 @clear="clearFilters"
@@ -173,14 +198,18 @@
 
 <script setup lang="ts">
 import { IconAdjustmentsHorizontal, IconSearch } from '@tabler/icons-vue'
+import { storeToRefs } from 'pinia'
 import type { Product } from '#shared/types/product'
+import { useCategoryStore } from '~/features/category/stores/category'
 
 useHead({ title: 'Catálogo — LUMIA' })
 
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalog()
-const { categories, fetchCategories } = useCategories()
+const categoryStore = useCategoryStore()
+const { categories } = storeToRefs(categoryStore)
+const { slugs: wishlistSlugs, load: loadWishlist } = useWishlist()
 
 const page = ref(Math.max(1, Number(route.query.page) || 1))
 const limit = ref(Math.min(48, Math.max(12, Number(route.query.limit) || 12)))
@@ -188,9 +217,17 @@ const searchInput = ref(typeof route.query.search === 'string' ? route.query.sea
 const searchApplied = ref(searchInput.value.trim())
 const sortBy = ref('--')
 const promoOnly = ref(false)
+const favoritesOnly = ref(route.query.favorites === '1')
 const filtersDrawerOpen = ref(false)
 const selectedCategories = ref<string[]>([])
 let syncingRoute = false
+
+onMounted(() => {
+  void loadWishlist()
+})
+
+const wishlistCount = computed(() => wishlistSlugs.value.length)
+const wishlistKey = computed(() => [...wishlistSlugs.value].sort().join(','))
 
 const sortOptions = [
   { value: '--', label: 'Destacados' },
@@ -216,6 +253,7 @@ function syncFromRoute() {
   const search = typeof route.query.search === 'string' ? route.query.search : ''
   searchInput.value = search
   searchApplied.value = search.trim()
+  favoritesOnly.value = route.query.favorites === '1'
   syncingRoute = false
 }
 
@@ -228,6 +266,7 @@ function updateRouteQuery() {
       limit: limit.value !== 12 ? String(limit.value) : undefined,
       search: searchApplied.value || undefined,
       category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
+      favorites: favoritesOnly.value ? '1' : undefined,
     },
   })
 }
@@ -238,18 +277,41 @@ function scrollCatalogTop() {
 }
 
 const categoryKey = computed(() => selectedCategories.value.join(','))
+const catalogFetchKey = computed(() => {
+  if (favoritesOnly.value) return `fav-${wishlistKey.value}`
+  return `${page.value}-${limit.value}-${searchApplied.value}-${categoryKey.value}`
+})
 
-const { data, pending } = await useAsyncData(
-  () => `catalog-${page.value}-${limit.value}-${searchApplied.value}-${categoryKey.value}`,
-  () =>
-    catalog.fetchProducts({
-      page: page.value,
-      limit: limit.value,
-      search: searchApplied.value || undefined,
-      category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
-    }),
-  { watch: [page, limit, searchApplied, categoryKey] }
-)
+const [{ data, pending }, categoriesPayload] = await Promise.all([
+  useAsyncData(
+    () => `catalog-${catalogFetchKey.value}`,
+    () => {
+      if (favoritesOnly.value) {
+        const slugs = wishlistSlugs.value
+        if (!slugs.length) {
+          return Promise.resolve({
+            products: [] as Product[],
+            source: 'mongodb' as const,
+            pagination: { page: 1, limit: 30, total: 0, totalPages: 1 },
+          })
+        }
+        return catalog.fetchProducts({ slugs: slugs.join(','), limit: 30, page: 1 })
+      }
+      return catalog.fetchProducts({
+        page: page.value,
+        limit: limit.value,
+        search: searchApplied.value || undefined,
+        category: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
+      })
+    },
+    { watch: [catalogFetchKey, favoritesOnly, wishlistSlugs] }
+  ),
+  useAsyncData('catalog-categories', () => $fetch<{ categories: typeof categories.value }>('/api/categories')),
+])
+
+if (categoriesPayload.data.value?.categories?.length) {
+  categoryStore.hydrate(categoriesPayload.data.value.categories)
+}
 
 const products = computed(() => data.value?.products ?? [])
 const pagination = computed(() => data.value?.pagination)
@@ -265,7 +327,11 @@ const rangeEnd = computed(() => {
 })
 
 const hasActiveFilters = computed(
-  () => selectedCategories.value.length > 0 || promoOnly.value || Boolean(searchApplied.value)
+  () =>
+    selectedCategories.value.length > 0 ||
+    promoOnly.value ||
+    favoritesOnly.value ||
+    Boolean(searchApplied.value)
 )
 
 function productHasPromo(p: Product) {
@@ -280,6 +346,14 @@ function getPriceForSort(p: Product) {
 
 const filteredProducts = computed(() => {
   let list = [...products.value]
+  if (selectedCategories.value.length) {
+    const set = new Set(selectedCategories.value)
+    list = list.filter((p) => p.categorySlug && set.has(p.categorySlug))
+  }
+  if (searchApplied.value) {
+    const q = searchApplied.value.toLowerCase()
+    list = list.filter((p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q))
+  }
   if (promoOnly.value) list = list.filter(productHasPromo)
   switch (sortBy.value) {
     case 'name-asc':
@@ -306,6 +380,7 @@ function clearFilters() {
   searchApplied.value = ''
   selectedCategories.value = []
   promoOnly.value = false
+  favoritesOnly.value = false
   sortBy.value = '--'
   page.value = 1
   limit.value = 12
@@ -316,6 +391,12 @@ function toggleCategoryChip(slug: string) {
   const set = new Set(selectedCategories.value)
   set.has(slug) ? set.delete(slug) : set.add(slug)
   selectedCategories.value = Array.from(set)
+  page.value = 1
+  updateRouteQuery()
+}
+
+function toggleFavoritesOnly() {
+  favoritesOnly.value = !favoritesOnly.value
   page.value = 1
   updateRouteQuery()
 }
@@ -340,13 +421,15 @@ watch(selectedCategories, () => {
   updateRouteQuery()
 })
 
+watch(favoritesOnly, () => {
+  if (syncingRoute) return
+  page.value = 1
+  updateRouteQuery()
+})
+
 watch(
   () => route.query,
   () => syncFromRoute(),
   { deep: true }
 )
-
-onMounted(() => {
-  void fetchCategories()
-})
 </script>

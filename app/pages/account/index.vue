@@ -11,6 +11,7 @@
       <p class="mt-1 text-sm text-lumia-ink/55">{{ user.email }}</p>
 
       <BaseButton to="/account/orders" variant="secondary" class="mt-6">Mis pedidos</BaseButton>
+      <BaseButton to="/account/favorites" variant="secondary" class="mt-3">Favoritos</BaseButton>
       <BaseButton type="button" variant="ghost" class="mt-3" @click="logout">Cerrar sesión</BaseButton>
 
     </div>

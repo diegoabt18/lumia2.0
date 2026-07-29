@@ -1,15 +1,11 @@
-import { listCategories, countProductsByCategorySlug } from '../../core/catalog/infrastructure/category.repository'
+import { getCategoriesCached } from '../../utils/categories-cache'
+import { setPublicCacheHeaders } from '../../utils/memory-cache'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
-    const [categories, counts] = await Promise.all([listCategories(), countProductsByCategorySlug()])
-    const mapped = categories.map((c) => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      productCount: counts.get(c.slug) ?? 0,
-    }))
-    return { categories: mapped, items: mapped }
+    const categories = await getCategoriesCached()
+    setPublicCacheHeaders(event, 120)
+    return { categories, items: categories }
   } catch (e) {
     console.error('[api/categories]', e)
     throw createError({ statusCode: 503, message: 'Categorías no disponibles' })

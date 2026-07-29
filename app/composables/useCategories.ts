@@ -1,25 +1,16 @@
 import type { Category } from '#shared/types/category'
+import { storeToRefs } from 'pinia'
+import { useCategoryStore } from '~/features/category/stores/category'
 
 export function useCategories() {
-  const categories = ref<Category[]>([])
-  const loading = ref(false)
-  const loaded = ref(false)
+  const store = useCategoryStore()
+  const { categories } = storeToRefs(store)
 
-  async function fetchCategories() {
-    if (loading.value) return categories.value
-    loading.value = true
-    try {
-      const res = await $fetch<{ categories: Category[] }>('/api/categories')
-      categories.value = res.categories ?? []
-      loaded.value = true
-      return categories.value
-    } catch {
-      categories.value = []
-      return []
-    } finally {
-      loading.value = false
-    }
+  return {
+    categories,
+    fetchCategories: store.fetchCategories,
+    hydrateCategories: store.hydrate,
   }
-
-  return { categories, loading, loaded, fetchCategories }
 }
+
+export type { Category }

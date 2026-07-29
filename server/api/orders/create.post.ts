@@ -1,8 +1,10 @@
 import { orderCheckoutShippingSchema } from '#shared/schemas/order-checkout'
 import { isSalesDbConfigured } from '../../database/sales'
+import { isCatalogDbConfigured } from '../../database/catalog'
 import { getUserById } from '../../database/auth'
 import { createManualOrder } from '../../core/sales/order.repository'
 import { clearCart, getCartItems } from '../../core/sales/cart.repository'
+import { enrichCartItems } from '../../core/sales/enrich-cart-prices'
 import { resolveCartSubjectForWrite } from '../../utils/cart-context'
 import { getSessionFromEvent } from '../../utils/session'
 import { clearGuestCartCookie, getGuestCartKeyFromEvent } from '../../utils/guest-cart-cookie'
@@ -26,9 +28,18 @@ export default defineEventHandler(async (event) => {
   const subject = await resolveCartSubjectForWrite(event)
   if (!subject) throw createError({ statusCode: 401, message: 'No se pudo identificar el carrito' })
 
-  const cartItems = await getCartItems(subject.cartKey)
-  if (!cartItems.length) {
+  const rawCartItems = await getCartItems(subject.cartKey)
+  if (!rawCartItems.length) {
     throw createError({ statusCode: 400, message: 'El carrito está vacío' })
+  }
+
+  let cartItems = rawCartItems
+  if (isCatalogDbConfigured()) {
+    try {
+      cartItems = (await enrichCartItems(rawCartItems)).items
+    } catch (e) {
+      console.warn('[orders/create] enrich prices failed', (e as Error)?.message)
+    }
   }
 
   const session = await getSessionFromEvent(event)

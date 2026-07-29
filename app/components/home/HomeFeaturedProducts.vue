@@ -26,7 +26,7 @@
 
       <div v-else class="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
         <ProductCardPremium
-          v-for="(p, i) in items"
+          v-for="(p, i) in displayItems"
           :key="p.id"
           :product="p"
           :sales-badge="p.salesBadge ?? null"
@@ -34,7 +34,7 @@
         />
       </div>
 
-      <p v-if="!loading && !items.length" class="mt-12 text-center text-lumia-ink/50">
+      <p v-if="!loading && !displayItems.length" class="mt-12 text-center text-lumia-ink/50">
         Pronto tendremos nuevas piezas en esta vitrina.
       </p>
     </BaseContainer>
@@ -44,15 +44,19 @@
 <script setup lang="ts">
 import type { Product } from '#shared/types/product'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
-    items: Product[]
+    items?: Product[]
     loading?: boolean
     devRating?: boolean
   }>(),
   {
+    items: () => [],
     loading: false,
     devRating: true,
   }
 )
+
+/** Normaliza cuando el padre pasa `:items="undefined"` explícitamente (defaults de Vue no aplican). */
+const displayItems = computed(() => (Array.isArray(props.items) ? props.items : []))
 </script>

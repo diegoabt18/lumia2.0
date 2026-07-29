@@ -15,5 +15,6 @@ const { fetchCart } = useCart()
 
 onMounted(() => {
   void fetchCart()
+  void useWishlist().load()
 })
 </script>
