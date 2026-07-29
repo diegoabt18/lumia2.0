@@ -66,7 +66,10 @@ export async function addCartItem(
   if (inc.matchedCount > 0) return
 
   const push = await db.collection('carts').updateOne(
-    { userId: cartKey, 'items.sku': { $ne: input.sku } },
+    {
+      userId: cartKey,
+      items: { $not: { $elemMatch: { sku: input.sku } } },
+    },
     {
       $push: { items: line },
       $set: { updatedAt: now },
@@ -75,15 +78,15 @@ export async function addCartItem(
     { upsert: true }
   )
 
-  if (push.matchedCount === 0 && push.upsertedCount === 0) {
-    await db.collection('carts').updateOne(
-      { userId: cartKey, 'items.sku': input.sku },
-      {
-        $inc: { 'items.$.quantity': input.quantity },
-        $set: { updatedAt: now },
-      }
-    )
-  }
+  if (push.matchedCount > 0 || push.upsertedCount > 0) return
+
+  await db.collection('carts').updateOne(
+    { userId: cartKey, 'items.sku': input.sku },
+    {
+      $inc: { 'items.$.quantity': input.quantity },
+      $set: { updatedAt: now },
+    }
+  )
 }
 
 export async function setCartLineQuantity(cartKey: string, sku: string, quantity: number) {

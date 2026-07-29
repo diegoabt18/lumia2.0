@@ -161,7 +161,10 @@ export const useCartStore = defineStore('cart', () => {
             return false
           }
           if (status === 503) apiEnabled.value = false
-          else throw e
+          else if (status === 500 || status === 409 || status === 422) {
+            useToast().error(MSG_CART_UNAVAILABLE)
+            return false
+          } else throw e
         }
       }
       const ok = addItemLocal(payload)
