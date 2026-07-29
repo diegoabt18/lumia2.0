@@ -30,9 +30,9 @@
   },
   "env": {
     "production": {
-      "name": "lumia2",
+      "name": "applumia2",
       "vars": {
-        "NUXT_SITE_URL": "https://lumia2.tu-usuario.workers.dev",
+        "NUXT_SITE_URL": "https://lumiadalistore.com",
         "NUXT_PUBLIC_STORE_CURRENCY": "COP",
         "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
         "NUXT_PUBLIC_STORE_TIMEZONE": "America/Bogota",
@@ -45,12 +45,11 @@
         "NUXT_ORDER_NUMBER_PREFIX": "ORD",
         "NUXT_ORDER_PAYMENT_TTL_HOURS": "24",
         "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72"
-      }
-      // Dominio propio (descomenta y ajusta tras el primer deploy):
-      // ,"routes": [
-      //   { "pattern": "tudominio.com", "custom_domain": true },
-      //   { "pattern": "www.tudominio.com", "custom_domain": true }
-      // ]
+      },
+      "routes": [
+        { "pattern": "lumiadalistore.com", "custom_domain": true },
+        { "pattern": "www.lumiadalistore.com", "custom_domain": true }
+      ]
     }
   }
 }
