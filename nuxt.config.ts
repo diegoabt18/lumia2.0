@@ -74,6 +74,7 @@ export default defineNuxtConfig({
     preset: 'cloudflare_module',
     alias: {
       '@aws-sdk/credential-providers': mongoOptionalDepStub,
+      aws4: mongoOptionalDepStub,
       kerberos: mongoOptionalDepStub,
       'gcp-metadata': mongoOptionalDepStub,
       snappy: mongoOptionalDepStub,
