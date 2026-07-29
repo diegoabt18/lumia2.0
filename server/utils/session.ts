@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { SignJWT, jwtVerify, createRemoteJWKSet } from 'jose'
+import { sharedCookieDomain } from './cookie-domain'
 
 export const SESSION_COOKIE = 'lumia_session'
 const OAUTH_COOKIE_PATH = '/api/auth/google'
@@ -12,23 +13,27 @@ export interface SessionPayload {
 
 function sessionCookieOpts(event: H3Event, maxAgeSec: number) {
   const proto = getRequestProtocol(event, { xForwardedProto: true })
+  const domain = sharedCookieDomain(event)
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: proto === 'https',
     path: '/',
     maxAge: maxAgeSec,
+    ...(domain ? { domain } : {}),
   }
 }
 
 export function oauthCookieOpts(event: H3Event) {
   const proto = getRequestProtocol(event, { xForwardedProto: true })
+  const domain = sharedCookieDomain(event)
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: proto === 'https',
     path: OAUTH_COOKIE_PATH,
     maxAge: 600,
+    ...(domain ? { domain } : {}),
   }
 }
 
@@ -62,7 +67,12 @@ export function setSessionCookie(event: H3Event, token: string, maxAgeSec = 60 *
 
 export function clearSessionCookie(event: H3Event) {
   const o = sessionCookieOpts(event, 0)
-  deleteCookie(event, SESSION_COOKIE, { path: o.path, sameSite: o.sameSite, secure: o.secure })
+  deleteCookie(event, SESSION_COOKIE, {
+    path: o.path,
+    sameSite: o.sameSite,
+    secure: o.secure,
+    ...(o.domain ? { domain: o.domain } : {}),
+  })
 }
 
 export async function getSessionFromEvent(event: H3Event): Promise<SessionPayload | null> {
@@ -77,16 +87,21 @@ export async function getSessionFromEvent(event: H3Event): Promise<SessionPayloa
 const googleJwks = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
 
 export async function verifyGoogleIdToken(idToken: string, clientId: string) {
-  const { payload } = await jwtVerify(idToken, googleJwks, {
-    issuer: ['https://accounts.google.com', 'accounts.google.com'],
-    audience: clientId,
-  })
-  const sub = typeof payload.sub === 'string' ? payload.sub : ''
-  const email = typeof payload.email === 'string' ? payload.email : ''
-  const name = typeof payload.name === 'string' ? payload.name : email
-  const picture = typeof payload.picture === 'string' ? payload.picture : undefined
-  if (!sub || !email) return null
-  return { googleId: sub, email, name, avatar: picture }
+  try {
+    const { payload } = await jwtVerify(idToken, googleJwks, {
+      issuer: ['https://accounts.google.com', 'accounts.google.com'],
+      audience: clientId,
+    })
+    const sub = typeof payload.sub === 'string' ? payload.sub : ''
+    const email = typeof payload.email === 'string' ? payload.email : ''
+    const name = typeof payload.name === 'string' ? payload.name : email
+    const picture = typeof payload.picture === 'string' ? payload.picture : undefined
+    if (!sub || !email) return null
+    return { googleId: sub, email, name, avatar: picture }
+  } catch (e) {
+    console.warn('[oauth] id_token verify failed', (e as Error)?.message)
+    return null
+  }
 }
 
 export function safeReturnPath(raw: string | undefined, fallback = '/'): string {

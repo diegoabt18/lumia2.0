@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { isAuthDbConfigured } from '../../database/auth'
+import { resolveSiteOrigin } from '../../utils/cookie-domain'
 import { oauthCookieOpts, safeReturnPath } from '../../utils/session'
 
 const OAUTH_RETURN_COOKIE = 'oauth_return'
@@ -13,8 +14,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 503, message: 'MongoDB auth no configurado' })
   }
 
-  const requestUrl = getRequestURL(event)
-  const origin = config.siteUrl?.trim() ? config.siteUrl.replace(/\/$/, '') : requestUrl.origin
+  const origin = resolveSiteOrigin(event)
   const redirectUri = `${origin}/api/auth/google/callback`
 
   const query = getQuery(event)

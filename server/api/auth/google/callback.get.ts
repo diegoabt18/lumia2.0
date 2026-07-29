@@ -1,6 +1,7 @@
 import { isAuthDbConfigured, upsertGoogleUser } from '../../../database/auth'
 import { isSalesDbConfigured } from '../../../database/sales'
 import { mergeGuestCartIntoUser } from '../../../core/sales/cart.repository'
+import { resolveSiteOrigin } from '../../../utils/cookie-domain'
 import { clearGuestCartCookie, getGuestCartKeyFromEvent } from '../../../utils/guest-cart-cookie'
 import {
   oauthCookieOpts,
@@ -25,15 +26,17 @@ async function exchangeCodeForIdToken(code: string, redirectUri: string, clientI
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
   })
-  if (!res.ok) return null
+  if (!res.ok) {
+    console.warn('[oauth] token exchange failed', res.status, await res.text().catch(() => ''))
+    return null
+  }
   const json = (await res.json()) as { id_token?: string }
   return json.id_token ?? null
 }
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
-  const requestUrl = getRequestURL(event)
-  const origin = config.siteUrl?.trim() ? config.siteUrl.replace(/\/$/, '') : requestUrl.origin
+  const origin = resolveSiteOrigin(event)
   const redirectUri = `${origin}/api/auth/google/callback`
 
   const query = getQuery(event)
@@ -58,39 +61,54 @@ export default defineEventHandler(async (event) => {
   const cookieState = getCookie(event, 'oauth_state')
   const storedReturnPath = safeReturnPath(getCookie(event, OAUTH_RETURN_COOKIE), '/')
   const del = oauthCookieOpts(event)
-  deleteCookie(event, 'oauth_state', { path: del.path, sameSite: del.sameSite, secure: del.secure })
-  deleteCookie(event, OAUTH_RETURN_COOKIE, { path: del.path, sameSite: del.sameSite, secure: del.secure })
+  deleteCookie(event, 'oauth_state', {
+    path: del.path,
+    sameSite: del.sameSite,
+    secure: del.secure,
+    ...(del.domain ? { domain: del.domain } : {}),
+  })
+  deleteCookie(event, OAUTH_RETURN_COOKIE, {
+    path: del.path,
+    sameSite: del.sameSite,
+    secure: del.secure,
+    ...(del.domain ? { domain: del.domain } : {}),
+  })
 
   if (!cookieState || !qState || cookieState !== qState) {
     return sendRedirect(event, `${origin}/auth/login?error=oauth_state`)
   }
 
-  const idToken = await exchangeCodeForIdToken(code, redirectUri, config.googleClientId, config.googleClientSecret)
-  if (!idToken) {
-    return sendRedirect(event, `${origin}/auth/login?error=google_token`)
-  }
-
-  const googleUser = await verifyGoogleIdToken(idToken, config.googleClientId)
-  if (!googleUser) {
-    return sendRedirect(event, `${origin}/auth/login?error=google_user`)
-  }
-
-  const user = await upsertGoogleUser(googleUser)
-  const sessionToken = await signSessionToken(
-    { userId: user.id, email: user.email, role: user.role },
-    config.jwtSecret
-  )
-  setSessionCookie(event, sessionToken)
-
-  const guestKey = getGuestCartKeyFromEvent(event)
-  if (guestKey && isSalesDbConfigured()) {
-    try {
-      await mergeGuestCartIntoUser(guestKey, user.id)
-    } catch (e) {
-      console.warn('[oauth] merge guest cart failed', (e as Error)?.message)
+  try {
+    const idToken = await exchangeCodeForIdToken(code, redirectUri, config.googleClientId, config.googleClientSecret)
+    if (!idToken) {
+      return sendRedirect(event, `${origin}/auth/login?error=google_token`)
     }
-    clearGuestCartCookie(event)
-  }
 
-  return sendRedirect(event, `${origin}${storedReturnPath}`)
+    const googleUser = await verifyGoogleIdToken(idToken, config.googleClientId)
+    if (!googleUser) {
+      return sendRedirect(event, `${origin}/auth/login?error=google_user`)
+    }
+
+    const user = await upsertGoogleUser(googleUser)
+    const sessionToken = await signSessionToken(
+      { userId: user.id, email: user.email, role: user.role },
+      config.jwtSecret
+    )
+    setSessionCookie(event, sessionToken)
+
+    const guestKey = getGuestCartKeyFromEvent(event)
+    if (guestKey && isSalesDbConfigured()) {
+      try {
+        await mergeGuestCartIntoUser(guestKey, user.id)
+      } catch (e) {
+        console.warn('[oauth] merge guest cart failed', (e as Error)?.message)
+      }
+      clearGuestCartCookie(event)
+    }
+
+    return sendRedirect(event, `${origin}${storedReturnPath}`)
+  } catch (e) {
+    console.error('[oauth] callback failed', e)
+    return sendRedirect(event, `${origin}/auth/login?error=oauth_server`)
+  }
 })

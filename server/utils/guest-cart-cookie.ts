@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { randomUUID } from 'node:crypto'
+import { sharedCookieDomain } from './cookie-domain'
 
 export const GUEST_CART_COOKIE = 'lumia_guest_cart'
 const GUEST_KEY_PREFIX = 'guest:'
@@ -9,12 +10,14 @@ const UUID_RE =
 
 function guestCartCookieOpts(event: H3Event) {
   const proto = getRequestProtocol(event, { xForwardedProto: true })
+  const domain = sharedCookieDomain(event)
   return {
     httpOnly: true,
     sameSite: 'strict' as const,
     secure: proto === 'https',
     path: '/',
     maxAge: 60 * 60 * 24 * 60,
+    ...(domain ? { domain } : {}),
   }
 }
 
@@ -38,5 +41,10 @@ export function ensureGuestCartKey(event: H3Event): string {
 
 export function clearGuestCartCookie(event: H3Event) {
   const o = guestCartCookieOpts(event)
-  deleteCookie(event, GUEST_CART_COOKIE, { path: o.path, sameSite: o.sameSite, secure: o.secure })
+  deleteCookie(event, GUEST_CART_COOKIE, {
+    path: o.path,
+    sameSite: o.sameSite,
+    secure: o.secure,
+    ...(o.domain ? { domain: o.domain } : {}),
+  })
 }

@@ -25,6 +25,7 @@ const errorMessage = computed(() => {
     auth_db: 'Base de datos de usuarios no disponible.',
     google_token: 'No se pudo validar la respuesta de Google.',
     google_user: 'No se pudo obtener tu perfil de Google.',
+    oauth_server: 'Error interno al completar el login. Revisa Mongo auth y vuelve a intentar.',
   }
   return map[err] ?? 'No se pudo iniciar sesión. Intenta de nuevo.'
 })
