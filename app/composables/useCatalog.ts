@@ -20,10 +20,20 @@ function paginateMock(page: number, limit: number) {
   }
 }
 
+function emptyCatalog(page: number, limit: number) {
+  return {
+    products: [] as Product[],
+    source: 'mongodb' as const,
+    pagination: { page, limit, total: 0, totalPages: 1 },
+  }
+}
+
 /**
- * Catálogo con fallback automático a mocks si MongoDB no está configurado o falla.
+ * Catálogo: en desarrollo puede usar mocks si la API falla; en producción solo datos reales.
  */
 export function useCatalog() {
+  const allowMocks = import.meta.dev
+
   async function fetchProducts(query: {
     limit?: number
     page?: number
@@ -47,7 +57,7 @@ export function useCatalog() {
           promo: query.promo,
           sort: query.sort,
         },
-        timeout: 12_000,
+        timeout: 15_000,
       })
       const list = res.products?.length ? res.products : res.items ?? []
       return {
@@ -60,30 +70,36 @@ export function useCatalog() {
           totalPages: 1,
         },
       }
-    } catch {
-      if (query.slugs) {
-        const slugSet = new Set(query.slugs.split(',').map((s) => s.trim()).filter(Boolean))
-        const list = MOCK_PRODUCTS.filter((p) => slugSet.has(p.slug))
-        return {
-          products: list,
-          source: 'mock' as const,
-          pagination: { page: 1, limit: list.length, total: list.length, totalPages: 1 },
+    } catch (e) {
+      if (allowMocks) {
+        if (query.slugs) {
+          const slugSet = new Set(query.slugs.split(',').map((s) => s.trim()).filter(Boolean))
+          const list = MOCK_PRODUCTS.filter((p) => slugSet.has(p.slug))
+          return {
+            products: list,
+            source: 'mock' as const,
+            pagination: { page: 1, limit: list.length, total: list.length, totalPages: 1 },
+          }
         }
+        return paginateMock(page, limit)
       }
-      return paginateMock(page, limit)
+      throw e
     }
   }
 
   async function fetchProductBySlug(slug: string) {
     try {
-      const res = await $fetch<{ product: Product | null }>(`/api/products/${slug}`)
+      const res = await $fetch<{ product: Product | null }>(`/api/products/${slug}`, { timeout: 15_000 })
       if (res.product) return { product: res.product, source: 'mongodb' as const }
-    } catch {
-      /* fallback */
+      return { product: null, source: 'mongodb' as const }
+    } catch (e) {
+      if (allowMocks) {
+        const mock = MOCK_PRODUCTS.find((p) => p.slug === slug) ?? null
+        return { product: mock, source: 'mock' as const }
+      }
+      throw e
     }
-    const mock = MOCK_PRODUCTS.find((p) => p.slug === slug) ?? null
-    return { product: mock, source: 'mock' as const }
   }
 
-  return { fetchProducts, fetchProductBySlug }
+  return { fetchProducts, fetchProductBySlug, emptyCatalog }
 }

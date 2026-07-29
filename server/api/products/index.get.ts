@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
         promoOnly,
         sort,
       }),
-      8000,
+      12_000,
       'catalog list'
     )
     const totalPages = Math.max(1, Math.ceil(total / limit))
