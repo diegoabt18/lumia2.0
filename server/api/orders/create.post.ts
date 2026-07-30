@@ -4,8 +4,6 @@ import { orderCheckoutShippingSchema } from '#shared/schemas/order-checkout'
 
 import { isSalesDbConfigured } from '../../database/sales'
 
-import { getUserById } from '../../database/auth'
-
 import { createManualOrder } from '../../core/sales/order.repository'
 
 import { clearCart, getCartItems } from '../../core/sales/cart.repository'
@@ -14,9 +12,7 @@ import { findIdempotentOrder, saveIdempotentOrder } from '../../core/sales/order
 
 import { reserveCartStock, releaseCartStockReservations } from '../../core/sales/stock-reservation'
 
-import { resolveCartSubjectForWrite } from '../../utils/cart-context'
-
-import { getSessionFromEvent } from '../../utils/session'
+import { resolveCheckoutContext } from '../../utils/cart-context'
 
 import { signOrderAccessToken } from '../../utils/order-access-token'
 
@@ -35,8 +31,7 @@ import { withServerTimeout } from '../../utils/server-timeout'
 import { warmCheckoutMongo } from '../../utils/warm-mongo'
 
 const IDEMPOTENCY_HEADER = 'idempotency-key'
-/** Checkout: varias bases Mongo en una sola petición (carrito + stock + orden). */
-const CHECKOUT_MONGO_TIMEOUT_MS = 30_000
+const CHECKOUT_MONGO_TIMEOUT_MS = 25_000
 
 function readIdempotencyKey(event: H3Event): string | null {
   const raw = getHeader(event, IDEMPOTENCY_HEADER) ?? getHeader(event, 'Idempotency-Key')
@@ -58,14 +53,14 @@ function mapOrderCreateError(e: unknown): never {
   if (message.includes('timeout')) {
     throw createError({
       statusCode: 503,
-      message: 'El pedido tardó demasiado. Inténtalo de nuevo en unos segundos.',
+      message: 'El pedido tardó demasiado. Pulsa confirmar otra vez (no recargues la página).',
     })
   }
 
   if (message.includes('E11000') || message.includes('duplicate key')) {
     throw createError({
       statusCode: 503,
-      message: 'No se pudo registrar el pedido. Inténtalo de nuevo.',
+      message: 'No se pudo registrar el pedido. Pulsa confirmar otra vez.',
     })
   }
 
@@ -73,6 +68,13 @@ function mapOrderCreateError(e: unknown): never {
     statusCode: 500,
     message: 'No se pudo crear el pedido. Inténtalo de nuevo.',
   })
+}
+
+function shouldReserveStock(config: ReturnType<typeof useRuntimeConfig>): boolean {
+  const raw = config.checkoutReserveStock
+  if (raw === false || raw === 0) return false
+  if (typeof raw === 'string') return raw !== '0' && raw.toLowerCase() !== 'false'
+  return true
 }
 
 export default defineEventHandler(async (event) => {
@@ -94,6 +96,19 @@ export default defineEventHandler(async (event) => {
     }
 
     const config = useRuntimeConfig()
+    const reserveStock = shouldReserveStock(config)
+
+    const [{ subject, session }] = await Promise.all([
+      resolveCheckoutContext(event),
+      warmCheckoutMongo({ reserveStock }),
+    ]).then(([ctx]) => [ctx] as const)
+
+    const idempotencyKey = readIdempotencyKey(event)
+    if (idempotencyKey) {
+      const cached = await findIdempotentOrder(idempotencyKey, subject.cartKey)
+      if (cached) return cached
+    }
+
     const turnstileSecret = String(config.turnstileSecretKey || '').trim()
     if (turnstileSecret) {
       const token = parsed.data.turnstileToken?.trim()
@@ -103,44 +118,19 @@ export default defineEventHandler(async (event) => {
       const ip = getRequestIP(event, { xForwardedFor: true })
       const verified = await withServerTimeout(
         verifyTurnstileToken(token, turnstileSecret, ip),
-        5_000,
+        4_000,
         'turnstile verify'
       )
       if (!verified) {
         throw createError({
           statusCode: 403,
-          message: 'Verificación de seguridad inválida. Recarga e inténtalo de nuevo.',
+          message: 'Verificación de seguridad inválida. Completa el captcha e inténtalo de nuevo.',
         })
       }
     }
 
-    await warmCheckoutMongo()
-
-    const subject = await resolveCartSubjectForWrite(event)
-    if (!subject) throw createError({ statusCode: 401, message: 'No se pudo identificar el carrito' })
-
-    const idempotencyKey = readIdempotencyKey(event)
-    if (idempotencyKey) {
-      const cached = await withServerTimeout(
-        findIdempotentOrder(idempotencyKey, subject.cartKey),
-        6_000,
-        'order idempotency read'
-      )
-      if (cached) return cached
-    }
-
-    const session = await getSessionFromEvent(event)
-    let email: string | null = session?.email?.trim() ?? null
     const userId = session?.userId ?? null
-
-    if (userId && !email) {
-      try {
-        const user = await withServerTimeout(getUserById(userId), 5_000, 'order user email')
-        email = user?.email?.trim() ?? null
-      } catch {
-        /* auth db opcional para email */
-      }
-    }
+    let email: string | null = session?.email?.trim() ?? null
 
     if (!userId) {
       const guestEmail = parsed.data.email?.trim()
@@ -155,15 +145,14 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 503, message: 'Configuración de seguridad incompleta' })
     }
 
-    // Precios del carrito persistido; reserva de stock valida disponibilidad atómicamente.
-    const { cartItems, stockReservations, result } = await withServerTimeout(
+    const checkoutResult = await withServerTimeout(
       (async () => {
         const items = await getCartItems(subject.cartKey)
         if (!items.length) {
           throw createError({ statusCode: 400, message: 'El carrito está vacío' })
         }
 
-        const reservations = await reserveCartStock(items)
+        const reservations = reserveStock ? await reserveCartStock(items) : []
         const orderSubtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
         const shippingQuote = quoteStoreShipping(orderSubtotal)
 
@@ -188,11 +177,36 @@ export default defineEventHandler(async (event) => {
             shippingCost: shippingQuote.shippingCost,
             stockReservations: reservations,
           })
-          return { cartItems: items, stockReservations: reservations, result: created }
+
+          const accessToken = await signOrderAccessToken(created.orderNumber, jwtSecret)
+          const response = {
+            orderId: created.id,
+            orderNumber: created.orderNumber,
+            total: created.total,
+            currency: created.currency,
+            paymentStatus: 'pending_manual' as const,
+            paymentMethod: 'manual' as const,
+            accessToken,
+            instructions:
+              'El vendedor se comunicará contigo para coordinar el pago. El pedido quedará en espera de confirmación.',
+          }
+
+          await Promise.all([
+            clearCart(subject.cartKey),
+            idempotencyKey
+              ? saveIdempotentOrder(idempotencyKey, subject.cartKey, response).catch((err) => {
+                  console.warn('[orders/create] idempotency save failed', (err as Error)?.message)
+                })
+              : Promise.resolve(),
+          ])
+
+          return { cartItems: items, response }
         } catch (e) {
-          await releaseCartStockReservations(reservations).catch((err) => {
-            console.warn('[orders/create] release reservations failed', (err as Error)?.message)
-          })
+          if (reservations.length) {
+            await releaseCartStockReservations(reservations).catch((err) => {
+              console.warn('[orders/create] release reservations failed', (err as Error)?.message)
+            })
+          }
           throw e
         }
       })(),
@@ -200,65 +214,28 @@ export default defineEventHandler(async (event) => {
       'checkout mongo pipeline'
     )
 
-    const accessToken = await signOrderAccessToken(result.orderNumber, jwtSecret)
-    const siteOrigin = String(config.siteUrl || getRequestURL(event).origin).replace(/\/$/, '')
-    const viewOrderUrl = `${siteOrigin}/thank-you?token=${encodeURIComponent(accessToken)}`
-
-    try {
-      await clearCart(subject.cartKey)
-      if (subject.kind === 'guest' && getGuestCartKeyFromEvent(event)) {
-        clearGuestCartCookie(event)
-      }
-    } catch {
-      /* no crítico */
+    if (subject.kind === 'guest' && getGuestCartKeyFromEvent(event)) {
+      clearGuestCartCookie(event)
     }
 
     void sendOrderConfirmationEmails(
       {
-        orderNumber: result.orderNumber,
+        orderNumber: checkoutResult.response.orderNumber,
         customerName: parsed.data.customerName,
-        total: result.total,
-        currency: result.currency,
+        total: checkoutResult.response.total,
+        currency: checkoutResult.response.currency,
         phone: parsed.data.phone,
-        items: cartItems.map((i) => ({
+        items: checkoutResult.cartItems.map((i) => ({
           name: i.variantLabel ? `${i.productName} — ${i.variantLabel}` : i.productName,
           quantity: i.quantity,
           subtotal: i.unitPrice * i.quantity,
         })),
-        viewOrderUrl,
+        viewOrderUrl: `${String(config.siteUrl || getRequestURL(event).origin).replace(/\/$/, '')}/thank-you?token=${encodeURIComponent(checkoutResult.response.accessToken)}`,
       },
       email
     ).catch((e) => console.warn('[email] order notification failed', (e as Error)?.message))
 
-    const response = {
-      orderId: result.id,
-      orderNumber: result.orderNumber,
-      total: result.total,
-      currency: result.currency,
-      paymentStatus: 'pending_manual' as const,
-      paymentMethod: 'manual' as const,
-      accessToken,
-      instructions:
-        'El vendedor se comunicará contigo para coordinar el pago. El pedido quedará en espera de confirmación.',
-    }
-
-    if (idempotencyKey) {
-      const saved = await withServerTimeout(
-        saveIdempotentOrder(idempotencyKey, subject.cartKey, response),
-        6_000,
-        'order idempotency save'
-      )
-      if (!saved) {
-        const cached = await withServerTimeout(
-          findIdempotentOrder(idempotencyKey, subject.cartKey),
-          6_000,
-          'order idempotency read'
-        )
-        if (cached) return cached
-      }
-    }
-
-    return response
+    return checkoutResult.response
   } catch (e) {
     mapOrderCreateError(e)
   }

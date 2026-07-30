@@ -138,6 +138,11 @@ export default defineNuxtConfig({
     orderManualPaymentTtlHours: 72,
     /** Secreto para cron jobs (`Authorization: Bearer` o header `X-Cron-Secret`). */
     cronSecret: '',
+    /**
+     * Reservar stock en checkout (consulta catalog_db).
+     * Pon `0` o `false` si Mongo catálogo es lento desde Workers; el stock ya se validó al añadir al carrito.
+     */
+    checkoutReserveStock: '1',
 
     public: {
       storeCurrency: 'COP',

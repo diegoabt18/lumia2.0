@@ -62,7 +62,8 @@
         "NUXT_PUBLIC_PRODUCT_IMAGE_GALLERY_LAYOUT": "flat",
         "NUXT_ORDER_NUMBER_PREFIX": "ORD",
         "NUXT_ORDER_PAYMENT_TTL_HOURS": "24",
-        "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72"
+        "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72",
+        "NUXT_CHECKOUT_RESERVE_STOCK": "1"
       },
       "routes": [
         { "pattern": "lumiadalistore.com", "custom_domain": true },
