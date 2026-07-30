@@ -33,7 +33,6 @@
                 {{ product.name }}
               </h1>
             </div>
-          </div>
 
             <div class="mt-5">
               <PdpBadgesRow :sales-badge="product.salesBadge ?? null" />
