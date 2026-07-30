@@ -388,7 +388,7 @@ const isMobileLayout = useMediaQuery('(max-width: 1023px)')
 const { y: scrollY } = useWindowScroll()
 
 const catalogImagePath = computed(() => selectedVariant.value?.imagePath ?? product.value?.imagePath ?? '')
-const { slides: gallerySlides, probing: galleryProbing } = usePdpGallerySlides(slugRef, catalogImagePath)
+const { slides: gallerySlides, probing: galleryProbing } = usePdpGallerySlides(slugParam, catalogImagePath)
 
 const stickyVisible = computed(() => Boolean(product.value && isMobileLayout.value && scrollY.value > 200))
 const stickyThumbSrc = computed(() => gallerySlides.value[0]?.thumb ?? editorialFallbackSrc.value)
