@@ -59,33 +59,17 @@ async function reserveInventorySku(
   const reservations: StockReservationLine[] = []
   let remaining = quantity
 
-  while (remaining > 0) {
-    const doc = await db.collection('inventory_items').findOne(
-      {
-        sku,
-        $expr: {
-          $gt: [
-            {
-              $subtract: [{ $ifNull: ['$quantity', 0] }, { $ifNull: ['$reserved', 0] }],
-            },
-            0,
-          ],
-        },
-      },
-      { sort: { _id: 1 }, projection: { quantity: 1, reserved: 1 } }
-    )
+  const docs = await db
+    .collection('inventory_items')
+    .find({ sku })
+    .sort({ _id: 1 })
+    .project({ quantity: 1, reserved: 1 })
+    .toArray()
 
-    if (!doc) {
-      if (reservations.length) {
-        await releaseCartStockReservations(reservations)
-      }
-      return null
-    }
+  for (const doc of docs) {
+    if (remaining <= 0) break
 
-    const available = Math.max(
-      0,
-      Number(doc.quantity ?? 0) - Number(doc.reserved ?? 0)
-    )
+    const available = Math.max(0, Number(doc.quantity ?? 0) - Number(doc.reserved ?? 0))
     if (available <= 0) continue
 
     const take = Math.min(remaining, available)
@@ -116,7 +100,7 @@ async function reserveInventorySku(
   }
 
   if (remaining > 0) {
-    await releaseCartStockReservations(reservations)
+    if (reservations.length) await releaseCartStockReservations(reservations)
     return null
   }
 

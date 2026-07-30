@@ -4,19 +4,13 @@ import { orderCheckoutShippingSchema } from '#shared/schemas/order-checkout'
 
 import { isSalesDbConfigured } from '../../database/sales'
 
-import { isCatalogDbConfigured } from '../../database/catalog'
-
 import { getUserById } from '../../database/auth'
 
 import { createManualOrder } from '../../core/sales/order.repository'
 
 import { clearCart, getCartItems } from '../../core/sales/cart.repository'
 
-import { enrichCartItems } from '../../core/sales/enrich-cart-prices'
-
 import { findIdempotentOrder, saveIdempotentOrder } from '../../core/sales/order-idempotency'
-
-import { validateCartStock } from '../../core/sales/validate-cart-stock'
 
 import { reserveCartStock, releaseCartStockReservations } from '../../core/sales/stock-reservation'
 
@@ -39,6 +33,8 @@ import { quoteStoreShipping } from '../../utils/store-shipping'
 import { withServerTimeout } from '../../utils/server-timeout'
 
 const IDEMPOTENCY_HEADER = 'idempotency-key'
+/** Checkout: varias bases Mongo en una sola petición (carrito + stock + orden). */
+const CHECKOUT_MONGO_TIMEOUT_MS = 28_000
 
 function readIdempotencyKey(event: H3Event): string | null {
   const raw = getHeader(event, IDEMPOTENCY_HEADER) ?? getHeader(event, 'Idempotency-Key')
@@ -119,36 +115,10 @@ export default defineEventHandler(async (event) => {
     if (idempotencyKey) {
       const cached = await withServerTimeout(
         findIdempotentOrder(idempotencyKey, subject.cartKey),
-        5_000,
+        6_000,
         'order idempotency read'
       )
       if (cached) return cached
-    }
-
-    const rawCartItems = await withServerTimeout(getCartItems(subject.cartKey), 8_000, 'cart read for order')
-    if (!rawCartItems.length) {
-      throw createError({ statusCode: 400, message: 'El carrito está vacío' })
-    }
-
-    let cartItems = rawCartItems
-    if (isCatalogDbConfigured()) {
-      try {
-        cartItems = (
-          await withServerTimeout(enrichCartItems(rawCartItems), 8_000, 'cart price enrich')
-        ).items
-      } catch (e) {
-        console.warn('[orders/create] enrich prices failed', (e as Error)?.message)
-      }
-    }
-
-    const stockCheck = await withServerTimeout(validateCartStock(cartItems), 8_000, 'cart stock validation')
-    if (!stockCheck.ok) {
-      const first = stockCheck.issues[0]
-      const detail =
-        stockCheck.issues.length === 1 && first
-          ? `${first.productName}: solo hay ${first.available} disponible(s).`
-          : 'Algunos productos ya no tienen stock suficiente. Revisa tu carrito.'
-      throw createError({ statusCode: 409, message: detail, data: { stockIssues: stockCheck.issues } })
     }
 
     const session = await getSessionFromEvent(event)
@@ -157,7 +127,7 @@ export default defineEventHandler(async (event) => {
 
     if (userId && !email) {
       try {
-        const user = await getUserById(userId)
+        const user = await withServerTimeout(getUserById(userId), 5_000, 'order user email')
         email = user?.email?.trim() ?? null
       } catch {
         /* auth db opcional para email */
@@ -177,42 +147,50 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 503, message: 'Configuración de seguridad incompleta' })
     }
 
-    const stockReservations = await withServerTimeout(reserveCartStock(cartItems), 10_000, 'cart stock reserve')
-    const orderSubtotal = cartItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
-    const shippingQuote = quoteStoreShipping(orderSubtotal)
+    // Precios del carrito persistido; reserva de stock valida disponibilidad atómicamente.
+    const { cartItems, stockReservations, result } = await withServerTimeout(
+      (async () => {
+        const items = await getCartItems(subject.cartKey)
+        if (!items.length) {
+          throw createError({ statusCode: 400, message: 'El carrito está vacío' })
+        }
 
-    let result: Awaited<ReturnType<typeof createManualOrder>>
-    try {
-      result = await withServerTimeout(
-        createManualOrder({
-          cartItems: cartItems.map((i) => ({
-            sku: i.sku,
-            productSlug: i.productSlug,
-            productName: i.productName,
-            variantLabel: i.variantLabel,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            currency: i.currency,
-            imagePath: i.imagePath,
-          })),
-          shipping: parsed.data,
-          userId,
-          email,
-          orderNumberPrefix: String(config.orderNumberPrefix || 'ORD'),
-          defaultCurrency: String(config.public.storeCurrency || 'COP'),
-          manualPaymentTtlHours: Number(config.orderManualPaymentTtlHours || 72),
-          shippingCost: shippingQuote.shippingCost,
-          stockReservations,
-        }),
-        10_000,
-        'order insert'
-      )
-    } catch (e) {
-      await releaseCartStockReservations(stockReservations).catch((err) => {
-        console.warn('[orders/create] release reservations failed', (err as Error)?.message)
-      })
-      throw e
-    }
+        const reservations = await reserveCartStock(items)
+        const orderSubtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
+        const shippingQuote = quoteStoreShipping(orderSubtotal)
+
+        try {
+          const created = await createManualOrder({
+            cartItems: items.map((i) => ({
+              sku: i.sku,
+              productSlug: i.productSlug,
+              productName: i.productName,
+              variantLabel: i.variantLabel,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              currency: i.currency,
+              imagePath: i.imagePath,
+            })),
+            shipping: parsed.data,
+            userId,
+            email,
+            orderNumberPrefix: String(config.orderNumberPrefix || 'ORD'),
+            defaultCurrency: String(config.public.storeCurrency || 'COP'),
+            manualPaymentTtlHours: Number(config.orderManualPaymentTtlHours || 72),
+            shippingCost: shippingQuote.shippingCost,
+            stockReservations: reservations,
+          })
+          return { cartItems: items, stockReservations: reservations, result: created }
+        } catch (e) {
+          await releaseCartStockReservations(reservations).catch((err) => {
+            console.warn('[orders/create] release reservations failed', (err as Error)?.message)
+          })
+          throw e
+        }
+      })(),
+      CHECKOUT_MONGO_TIMEOUT_MS,
+      'checkout mongo pipeline'
+    )
 
     const accessToken = await signOrderAccessToken(result.orderNumber, jwtSecret)
     const siteOrigin = String(config.siteUrl || getRequestURL(event).origin).replace(/\/$/, '')
@@ -259,13 +237,13 @@ export default defineEventHandler(async (event) => {
     if (idempotencyKey) {
       const saved = await withServerTimeout(
         saveIdempotentOrder(idempotencyKey, subject.cartKey, response),
-        5_000,
+        6_000,
         'order idempotency save'
       )
       if (!saved) {
         const cached = await withServerTimeout(
           findIdempotentOrder(idempotencyKey, subject.cartKey),
-          5_000,
+          6_000,
           'order idempotency read'
         )
         if (cached) return cached

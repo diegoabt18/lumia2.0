@@ -4,9 +4,9 @@ import { createError } from 'h3'
 
 interface MongoPool {
   client: MongoClient
-  db: Db
 }
 
+/** Un cliente TCP por URI (comparte conexión entre sales_db, catalog_db, etc.). */
 const pools = new Map<string, MongoPool>()
 const lastPingOkAt = new Map<string, number>()
 const PING_TTL_MS = 30_000
@@ -33,11 +33,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   })
 }
 
-/**
- * Algunos DNS de router/ISP (p. ej. GPON) responden a nslookup pero rechazan
- * querySrv desde Node → mongodb+srv:// falla con ECONNREFUSED.
- * DNS públicos evitan eso en dev local; en Workers/Atlas suele no hacer falta.
- */
 function ensurePublicDnsForSrv(uri: string) {
   if (dnsServersConfigured || !uri.startsWith('mongodb+srv://')) return
   try {
@@ -51,59 +46,53 @@ function ensurePublicDnsForSrv(uri: string) {
 function mongoClientOptions() {
   const onWorkers = isCloudflareWorkersRuntime()
   return {
-    serverSelectionTimeoutMS: onWorkers ? 5000 : 8000,
-    socketTimeoutMS: onWorkers ? 10000 : 60000,
-    connectTimeoutMS: onWorkers ? 5000 : 10000,
-    maxPoolSize: onWorkers ? 1 : undefined,
-    maxIdleTimeMS: onWorkers ? 10000 : undefined,
+    serverSelectionTimeoutMS: onWorkers ? 8000 : 8000,
+    socketTimeoutMS: onWorkers ? 20000 : 60000,
+    connectTimeoutMS: onWorkers ? 8000 : 10000,
+    maxPoolSize: onWorkers ? 4 : undefined,
+    maxIdleTimeMS: onWorkers ? 30000 : undefined,
   }
 }
 
-async function pingPool(pool: MongoPool, dbName: string): Promise<void> {
+async function pingPool(pool: MongoPool): Promise<void> {
   await withTimeout(
-    pool.client.db(dbName).command({ ping: 1 }, { serverSelectionTimeoutMS: 2000 }),
-    2500,
+    pool.client.db('admin').command({ ping: 1 }, { serverSelectionTimeoutMS: 3000 }),
+    3500,
     'mongo ping'
   )
 }
 
-async function disposePool(key: string, pool: MongoPool) {
-  pools.delete(key)
+async function disposePool(uri: string, pool: MongoPool) {
+  pools.delete(uri)
+  lastPingOkAt.delete(uri)
   await pool.client.close().catch(() => {})
 }
 
-/**
- * Obtiene (o crea) un pool de conexión MongoDB para una URI + nombre de base.
- * En Workers el ping tiene timeout duro para no colgar el isolate si la conexión quedó zombi.
- */
 export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
   ensurePublicDnsForSrv(uri)
   const onWorkers = isCloudflareWorkersRuntime()
-  const key = `${uri}::${dbName}`
-  const existing = pools.get(key)
+  const existing = pools.get(uri)
 
   if (existing) {
     const pingTtl = onWorkers ? WORKERS_PING_TTL_MS : PING_TTL_MS
-    const pingFresh = Date.now() - (lastPingOkAt.get(key) ?? 0) < pingTtl
-    if (pingFresh) return existing.db
+    const pingFresh = Date.now() - (lastPingOkAt.get(uri) ?? 0) < pingTtl
+    if (pingFresh) return existing.client.db(dbName)
     try {
-      await pingPool(existing, dbName)
-      lastPingOkAt.set(key, Date.now())
-      return existing.db
+      await pingPool(existing)
+      lastPingOkAt.set(uri, Date.now())
+      return existing.client.db(dbName)
     } catch {
-      lastPingOkAt.delete(key)
-      await disposePool(key, existing)
+      await disposePool(uri, existing)
     }
   }
 
   const client = new MongoClient(uri, mongoClientOptions())
 
   try {
-    await withTimeout(client.connect(), onWorkers ? 4000 : 10000, 'mongo connect')
-    const db = client.db(dbName)
-    pools.set(key, { client, db })
-    lastPingOkAt.set(key, Date.now())
-    return db
+    await withTimeout(client.connect(), onWorkers ? 8000 : 10000, 'mongo connect')
+    pools.set(uri, { client })
+    lastPingOkAt.set(uri, Date.now())
+    return client.db(dbName)
   } catch (e) {
     await client.close().catch(() => {})
     console.error(`[mongo] Connection failed (${dbName}):`, e)
@@ -114,7 +103,6 @@ export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
   }
 }
 
-/** Extrae el nombre de base de la URI o usa el fallback. */
 export function resolveDbName(uri: string, fallback: string): string {
   try {
     const pathname = new URL(uri.replace('mongodb+srv://', 'https://')).pathname
