@@ -4,9 +4,21 @@ function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
+/** En Cloudflare Workers las vars de wrangler no siempre llegan a useRuntimeConfig(). */
+function readWorkerEnv(name: string): string | undefined {
+  const processEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+  const fromProcess = processEnv?.[name]?.trim()
+  if (fromProcess) return fromProcess
+
+  const binding = (globalThis as { __env__?: Record<string, string | undefined> }).__env__?.[name]?.trim()
+  if (binding) return binding
+
+  return undefined
+}
+
 export function getLumiaApiBaseUrl(): string {
   const config = useRuntimeConfig()
-  const base = config.apiBaseUrl?.trim()
+  const base = config.apiBaseUrl?.trim() || readWorkerEnv('NUXT_API_BASE_URL')
   if (!base) {
     throw createError({
       statusCode: 503,
