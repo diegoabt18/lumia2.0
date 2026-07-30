@@ -47,7 +47,7 @@ export async function listCatalogProducts(
   event?: H3Event
 ): Promise<{ products: Product[]; total: number }> {
   const sort = options.sort ?? 'featured'
-  const needsPostProcess = Boolean(options.promoOnly) || sort !== 'featured'
+  const needsPostProcess = Boolean(options.promoOnly)
 
   if (!needsPostProcess) {
     return listProductsPage(
@@ -57,6 +57,7 @@ export async function listCatalogProducts(
         search: options.search,
         categorySlugs: options.categorySlugs,
         productSlugs: options.productSlugs,
+        sort,
       },
       event
     )
@@ -69,6 +70,7 @@ export async function listCatalogProducts(
       search: options.search,
       categorySlugs: options.categorySlugs,
       productSlugs: options.productSlugs,
+      sort,
     },
     event
   )

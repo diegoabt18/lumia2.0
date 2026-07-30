@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import type { CatalogSourceMode, ResolvedCatalogSource } from '#shared/types/catalog-source'
-import { getCatalogD1, isCatalogD1Bound } from '../database/catalog-d1'
+import { getCatalogD1, isCatalogD1Bound, pingCatalogD1 } from '../database/catalog-d1'
 import { isCatalogDbConfigured } from '../database/catalog'
 
 const AUTO_SOURCE_TTL_MS = 5 * 60 * 1000
@@ -51,34 +51,55 @@ export function resolveCatalogSourceForEvent(event?: H3Event): ResolvedCatalogSo
   return resolveCatalogSource({ mode, d1Available, mongoAvailable })
 }
 
-/** En modo `auto`, prefiere D1 solo si tiene productos; si no, Mongo. */
+async function d1HasSyncedCatalog(event?: H3Event): Promise<boolean> {
+  const db = getCatalogD1(event)
+  if (!db) return false
+
+  try {
+    const product = await db.prepare(`SELECT 1 AS ok FROM products LIMIT 1`).first<{ ok: number }>()
+    if (product?.ok === 1) return true
+
+    const meta = await db
+      .prepare(`SELECT value FROM migration_meta WHERE key = 'last_sync_at' LIMIT 1`)
+      .first<{ value: string }>()
+    return Boolean(meta?.value?.trim())
+  } catch {
+    return false
+  }
+}
+
+/** En modo `auto`, usa D1 si hay binding + schema + datos sync; evita fallback lento a Mongo. */
 export async function resolveCatalogSourceForEventAsync(event?: H3Event): Promise<ResolvedCatalogSource> {
   const mode = getConfiguredCatalogSourceMode()
   const d1Available = isCatalogD1Bound(event)
   const mongoAvailable = isCatalogDbConfigured()
 
-  if (mode !== 'auto' || !d1Available) {
+  if (mode === 'd1') {
     return resolveCatalogSource({ mode, d1Available, mongoAvailable })
   }
 
-  if (!mongoAvailable) return 'd1'
+  if (mode === 'mongo') {
+    return resolveCatalogSource({ mode, d1Available, mongoAvailable })
+  }
+
+  // auto
+  if (!d1Available) {
+    return mongoAvailable ? 'mongo' : 'mongo'
+  }
 
   const cached = autoSourceCache
-  if (cached && Date.now() - cached.at < AUTO_SOURCE_TTL_MS) {
-    return cached.source
+  if (cached?.source === 'd1' && Date.now() - cached.at < AUTO_SOURCE_TTL_MS) {
+    return 'd1'
   }
 
-  let resolved: ResolvedCatalogSource = 'mongo'
-  try {
-    const db = getCatalogD1(event)
-    if (db) {
-      const row = await db.prepare(`SELECT 1 FROM products LIMIT 1`).first<{ '1': number }>()
-      if (row) resolved = 'd1'
+  const d1Ping = await pingCatalogD1(event)
+  if (d1Ping.bound && d1Ping.connected) {
+    const hasData = await d1HasSyncedCatalog(event)
+    if (hasData) {
+      autoSourceCache = { at: Date.now(), source: 'd1' }
+      return 'd1'
     }
-  } catch {
-    resolved = 'mongo'
   }
 
-  autoSourceCache = { at: Date.now(), source: resolved }
-  return resolved
+  return mongoAvailable ? 'mongo' : 'd1'
 }

@@ -1,6 +1,7 @@
 import type { CatalogSort } from '../../core/catalog/catalog-listing'
 import { getResolvedCatalogSource } from '../../core/catalog/application/catalog-reader'
 import { listCatalogProductsCached } from '../../utils/catalog-listing-cache'
+import { setCatalogSourceHeader } from '../../utils/catalog-response'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
 import { withServerTimeout } from '../../utils/server-timeout'
 
@@ -48,11 +49,12 @@ export default defineEventHandler(async (event) => {
       promoOnly || sort !== 'featured' ? 30 : search || categorySlugs?.length ? 45 : 90
     setPublicCacheHeaders(event, cacheSeconds)
 
+    const source = await setCatalogSourceHeader(event)
     return {
       products,
       items: products,
       pagination: { page, limit, total, totalPages },
-      source: await getResolvedCatalogSource(event),
+      source,
     }
   } catch (e: unknown) {
     const err = e as { statusCode?: number; message?: string }

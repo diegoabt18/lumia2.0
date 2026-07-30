@@ -3,7 +3,7 @@ import type { Product } from '#shared/types/product'
 interface ProductsResponse {
   products?: Product[]
   items?: Product[]
-  source?: 'mongodb'
+  source?: 'd1' | 'mongo'
   pagination?: { page: number; limit: number; total: number; totalPages: number }
 }
 
@@ -46,7 +46,7 @@ export function useCatalog() {
     const list = res.products?.length ? res.products : res.items ?? []
     return {
       products: list,
-      source: 'mongodb' as const,
+      source: (res.source ?? 'd1') as 'd1' | 'mongo',
       pagination: res.pagination ?? {
         page,
         limit,
@@ -60,7 +60,7 @@ export function useCatalog() {
     const res = await fetchWithRetry<{ product: Product | null }>(`/api/products/${slug}`, {
       timeout: 8_000,
     })
-    return { product: res.product ?? null, source: 'mongodb' as const }
+    return { product: res.product ?? null, source: (res as { source?: 'd1' | 'mongo' }).source ?? 'd1' }
   }
 
   return { fetchProducts, fetchProductBySlug }

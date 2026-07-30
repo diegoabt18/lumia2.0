@@ -49,7 +49,7 @@
         }
       ],
       "vars": {
-        "NUXT_CATALOG_SOURCE": "auto",
+        "NUXT_CATALOG_SOURCE": "d1",
         "NUXT_SITE_URL": "https://lumiadalistore.com",
         "NUXT_PUBLIC_STORE_CURRENCY": "COP",
         "NUXT_PUBLIC_STORE_LOCALE": "es-CO",

@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import type { Product } from '#shared/types/product'
 import type { ResolvedCatalogSource } from '#shared/types/catalog-source'
+import type { CatalogSort } from '../catalog-listing'
 import { isCatalogDbConfigured } from '../../../database/catalog'
 import { isCatalogD1Bound, pingCatalogD1 } from '../../../database/catalog-d1'
 import {
@@ -11,9 +12,15 @@ import type { CategoryRow } from '../infrastructure/category.repository'
 
 async function resolveSource(event?: H3Event): Promise<ResolvedCatalogSource> {
   if (!event) {
+    const mode = getConfiguredCatalogSourceMode()
+    if (mode === 'd1' || (mode === 'auto' && !isCatalogDbConfigured())) return 'd1'
     return isCatalogDbConfigured() ? 'mongo' : 'd1'
   }
   return resolveCatalogSourceForEventAsync(event)
+}
+
+function warnMongoCatalogRead(operation: string) {
+  console.warn(`[catalog-reader] ${operation} → MongoDB (revisa NUXT_CATALOG_SOURCE y sync D1)`)
 }
 
 export async function getResolvedCatalogSource(event: H3Event): Promise<ResolvedCatalogSource> {
@@ -34,6 +41,7 @@ export async function listProductsPage(
     search?: string
     categorySlugs?: string[]
     productSlugs?: string[]
+    sort?: CatalogSort
   },
   event?: H3Event
 ): Promise<{ products: Product[]; total: number }> {
@@ -41,6 +49,7 @@ export async function listProductsPage(
 
   if (source === 'd1') {
     if (!event) {
+      warnMongoCatalogRead('listProductsPage (sin event)')
       const { listProductsPage: listMongo } = await import('../infrastructure/product.repository')
       return listMongo(options)
     }
@@ -48,6 +57,7 @@ export async function listProductsPage(
     return listProductsPageD1(event, options)
   }
 
+  warnMongoCatalogRead('listProductsPage')
   const { listProductsPage: listMongo } = await import('../infrastructure/product.repository')
   return listMongo(options)
 }
@@ -57,6 +67,7 @@ export async function getProductBySlug(slug: string, event?: H3Event): Promise<P
 
   if (source === 'd1') {
     if (!event) {
+      warnMongoCatalogRead('getProductBySlug (sin event)')
       const { getProductBySlug: getMongo } = await import('../infrastructure/product.repository')
       return getMongo(slug)
     }
@@ -64,6 +75,7 @@ export async function getProductBySlug(slug: string, event?: H3Event): Promise<P
     return getProductBySlugD1(event, slug)
   }
 
+  warnMongoCatalogRead('getProductBySlug')
   const { getProductBySlug: getMongo } = await import('../infrastructure/product.repository')
   return getMongo(slug)
 }
@@ -73,6 +85,7 @@ export async function listCategories(event?: H3Event): Promise<CategoryRow[]> {
 
   if (source === 'd1') {
     if (!event) {
+      warnMongoCatalogRead('listCategories (sin event)')
       const { listCategories: listMongo } = await import('../infrastructure/category.repository')
       return listMongo()
     }
@@ -80,6 +93,7 @@ export async function listCategories(event?: H3Event): Promise<CategoryRow[]> {
     return listCategoriesD1(event)
   }
 
+  warnMongoCatalogRead('listCategories')
   const { listCategories: listMongo } = await import('../infrastructure/category.repository')
   return listMongo()
 }

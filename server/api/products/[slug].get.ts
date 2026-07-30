@@ -1,4 +1,5 @@
-import { getProductBySlug, getResolvedCatalogSource } from '../../core/catalog/application/catalog-reader'
+import { getProductBySlug } from '../../core/catalog/application/catalog-reader'
+import { setCatalogSourceHeader } from '../../utils/catalog-response'
 import { withServerTimeout } from '../../utils/server-timeout'
 
 export default defineEventHandler(async (event) => {
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
     if (!product) {
       throw createError({ statusCode: 404, message: 'Producto no encontrado' })
     }
-    return { product, source: await getResolvedCatalogSource(event) }
+    return { product, source: await setCatalogSourceHeader(event) }
   } catch (e: unknown) {
     const err = e as { statusCode?: number; message?: string }
     if (err.statusCode === 404 || err.statusCode === 503) throw e

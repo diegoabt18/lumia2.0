@@ -9,7 +9,7 @@ import {
 import { loadTopSellingSlugsOnSession } from './category-d1.repository'
 import { getCatalogReadSession, persistCatalogBookmark } from './d1-session'
 import { findActivePromotionsOnSession } from './promotion-d1.repository'
-import type { CatalogD1DatabaseSession } from '../../../database/catalog-d1'
+import type { CatalogSort } from '../catalog-listing'
 
 interface ProductD1Row {
   slug: string
@@ -137,6 +137,19 @@ function buildProductListWhere(options: {
   return { sql: clauses.join(' AND '), params }
 }
 
+function buildProductListOrderBy(sort?: CatalogSort): string {
+  switch (sort) {
+    case 'name-asc':
+      return 'name ASC'
+    case 'price-asc':
+      return `(SELECT MIN(v.price) FROM variants v WHERE v.product_slug = products.slug) ASC, name ASC`
+    case 'price-desc':
+      return `(SELECT MIN(v.price) FROM variants v WHERE v.product_slug = products.slug) DESC, name ASC`
+    default:
+      return 'created_at DESC'
+  }
+}
+
 async function enrichProductDetailD1(event: H3Event, product: Product, rawVariants: VariantD1Row[]) {
   const { groupValueIdsByOption } = await import('../application/variant-option-rules')
 
@@ -209,6 +222,7 @@ export async function listProductsPageD1(
     search?: string
     categorySlugs?: string[]
     productSlugs?: string[]
+    sort?: CatalogSort
   }
 ): Promise<{ products: Product[]; total: number }> {
   const { applyPromotionsToProduct } = await import('../../pricing/apply-product-promotions')
@@ -216,6 +230,7 @@ export async function listProductsPageD1(
   const limit = Math.min(options.limit ?? 20, 100)
   const skip = options.skip ?? 0
   const { sql, params } = buildProductListWhere(options)
+  const orderBy = buildProductListOrderBy(options.sort)
 
   const now = new Date()
   const [productResult, countRow, topSlugs, promotions] = await Promise.all([
@@ -225,7 +240,7 @@ export async function listProductsPageD1(
                 sales_total_units, average_rating, reviews_count, created_at
          FROM products
          WHERE ${sql}
-         ORDER BY created_at DESC
+         ORDER BY ${orderBy}
          LIMIT ? OFFSET ?`
       )
       .bind(...params, limit, skip)
