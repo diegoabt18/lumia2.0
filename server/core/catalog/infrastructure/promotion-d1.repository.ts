@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import type { PromotionEntity } from '../domain/promotion'
+import type { CatalogD1DatabaseSession } from '../../../database/catalog-d1'
 import { getCatalogReadSession, persistCatalogBookmark } from './d1-session'
 
 interface PromotionRow {
@@ -49,8 +50,10 @@ function parsePromotionRow(row: PromotionRow): PromotionEntity {
   }
 }
 
-export async function findActivePromotionsD1(event: H3Event, at: Date): Promise<PromotionEntity[]> {
-  const session = getCatalogReadSession(event)
+export async function findActivePromotionsOnSession(
+  session: CatalogD1DatabaseSession,
+  at: Date
+): Promise<PromotionEntity[]> {
   const iso = at.toISOString()
   const { results } = await session
     .prepare(
@@ -62,6 +65,12 @@ export async function findActivePromotionsD1(event: H3Event, at: Date): Promise<
     .bind(iso, iso)
     .all<PromotionRow>()
 
-  persistCatalogBookmark(event, session)
   return results.map(parsePromotionRow)
+}
+
+export async function findActivePromotionsD1(event: H3Event, at: Date): Promise<PromotionEntity[]> {
+  const session = getCatalogReadSession(event)
+  const promos = await findActivePromotionsOnSession(session, at)
+  persistCatalogBookmark(event, session)
+  return promos
 }

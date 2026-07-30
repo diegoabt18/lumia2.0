@@ -6,9 +6,10 @@ import {
   listAxesWithValuesByProductSlugD1,
   listLegacyOptionsByProductSlugD1,
 } from './catalog-options-d1'
-import { findTopSellingSlugsD1 } from './category-d1.repository'
+import { loadTopSellingSlugsOnSession } from './category-d1.repository'
 import { getCatalogReadSession, persistCatalogBookmark } from './d1-session'
-import { findActivePromotionsD1 } from './promotion-d1.repository'
+import { findActivePromotionsOnSession } from './promotion-d1.repository'
+import type { CatalogD1DatabaseSession } from '../../../database/catalog-d1'
 
 interface ProductD1Row {
   slug: string
@@ -164,18 +165,40 @@ async function enrichProductDetailD1(event: H3Event, product: Product, rawVarian
   }
 }
 
-let promosCache: { at: number; promos: PromotionEntity[]; eventKey: string } | null = null
+let promosCache: { at: number; promos: PromotionEntity[] } | null = null
+let topSlugsCache: { at: number; slugs: string[] } | null = null
 const PROMOS_TTL_MS = 5 * 60 * 1000
+const TOP_SLUGS_TTL_MS = 10 * 60 * 1000
 
-async function findActivePromotionsCachedD1(event: H3Event): Promise<PromotionEntity[]> {
-  const key = 'd1'
+export function invalidateProductD1ModuleCaches(): void {
+  promosCache = null
+  topSlugsCache = null
+}
+
+async function findActivePromotionsCachedD1(
+  event: H3Event,
+  session: CatalogD1DatabaseSession
+): Promise<PromotionEntity[]> {
   const now = Date.now()
-  if (promosCache && promosCache.eventKey === key && now - promosCache.at < PROMOS_TTL_MS) {
+  if (promosCache && now - promosCache.at < PROMOS_TTL_MS) {
     return promosCache.promos
   }
-  const promos = await findActivePromotionsD1(event, new Date())
-  promosCache = { at: now, promos, eventKey: key }
+  const promos = await findActivePromotionsOnSession(session, new Date())
+  promosCache = { at: now, promos }
   return promos
+}
+
+async function findTopSellingSlugsCachedD1(
+  session: CatalogD1DatabaseSession,
+  limit: number
+): Promise<string[]> {
+  const now = Date.now()
+  if (topSlugsCache && now - topSlugsCache.at < TOP_SLUGS_TTL_MS) {
+    return topSlugsCache.slugs.slice(0, limit)
+  }
+  const slugs = await loadTopSellingSlugsOnSession(session, 20)
+  topSlugsCache = { at: now, slugs }
+  return slugs.slice(0, limit)
 }
 
 export async function listProductsPageD1(
@@ -194,6 +217,7 @@ export async function listProductsPageD1(
   const skip = options.skip ?? 0
   const { sql, params } = buildProductListWhere(options)
 
+  const now = new Date()
   const [productResult, countRow, topSlugs, promotions] = await Promise.all([
     session
       .prepare(
@@ -207,8 +231,8 @@ export async function listProductsPageD1(
       .bind(...params, limit, skip)
       .all<ProductD1Row>(),
     session.prepare(`SELECT COUNT(*) AS n FROM products WHERE ${sql}`).bind(...params).first<{ n: number }>(),
-    findTopSellingSlugsD1(event, 8),
-    findActivePromotionsCachedD1(event),
+    findTopSellingSlugsCachedD1(session, 8),
+    findActivePromotionsCachedD1(event, session),
   ])
 
   persistCatalogBookmark(event, session)
@@ -220,8 +244,7 @@ export async function listProductsPageD1(
   let variantDocs: VariantD1Row[] = []
   if (slugs.length) {
     const placeholders = slugs.map(() => '?').join(', ')
-    const variantSession = getCatalogReadSession(event)
-    const { results } = await variantSession
+    const { results } = await session
       .prepare(
         `SELECT sku, product_slug, price, compare_at_price, currency, options_json, image_path,
                 stock, available, is_per_order, option_rules_json, option_value_ids_json
@@ -231,13 +254,11 @@ export async function listProductsPageD1(
       )
       .bind(...slugs)
       .all<VariantD1Row>()
-    persistCatalogBookmark(event, variantSession)
     variantDocs = results
   }
 
   const variantsBySlug = groupVariantsByProductSlug(variantDocs)
   const topSet = new Set(topSlugs)
-  const now = new Date()
   const popularMin = Number(useRuntimeConfig().public.storePopularMinUnits) || 3
 
   const products = productRows.map((row) => {
@@ -276,8 +297,8 @@ export async function getProductBySlugD1(event: H3Event, slug: string): Promise<
       )
       .bind(slug)
       .all<VariantD1Row>(),
-    findTopSellingSlugsD1(event, 8),
-    findActivePromotionsCachedD1(event),
+    findTopSellingSlugsCachedD1(session, 8),
+    findActivePromotionsCachedD1(event, session),
   ])
 
   persistCatalogBookmark(event, session)

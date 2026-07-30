@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import type { CachedCategoryDto } from '../../../utils/categories-cache'
 import type { CategoryRow } from './category.repository'
+import type { CatalogD1DatabaseSession } from '../../../database/catalog-d1'
 import { getCatalogReadSession, persistCatalogBookmark } from './d1-session'
 
 interface CategoryD1Row {
@@ -58,8 +59,10 @@ export async function countProductsByCategorySlugD1(event: H3Event): Promise<Map
   return map
 }
 
-export async function findTopSellingSlugsD1(event: H3Event, limit: number): Promise<string[]> {
-  const session = getCatalogReadSession(event)
+export async function loadTopSellingSlugsOnSession(
+  session: CatalogD1DatabaseSession,
+  limit: number
+): Promise<string[]> {
   const safeLimit = Math.max(1, Math.min(limit, 20))
   const { results } = await session
     .prepare(
@@ -71,6 +74,12 @@ export async function findTopSellingSlugsD1(event: H3Event, limit: number): Prom
     .bind(safeLimit)
     .all<{ slug: string }>()
 
-  persistCatalogBookmark(event, session)
   return results.map((r) => r.slug).filter(Boolean)
+}
+
+export async function findTopSellingSlugsD1(event: H3Event, limit: number): Promise<string[]> {
+  const session = getCatalogReadSession(event)
+  const slugs = await loadTopSellingSlugsOnSession(session, limit)
+  persistCatalogBookmark(event, session)
+  return slugs
 }

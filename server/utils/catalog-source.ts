@@ -3,6 +3,13 @@ import type { CatalogSourceMode, ResolvedCatalogSource } from '#shared/types/cat
 import { getCatalogD1, isCatalogD1Bound } from '../database/catalog-d1'
 import { isCatalogDbConfigured } from '../database/catalog'
 
+const AUTO_SOURCE_TTL_MS = 5 * 60 * 1000
+let autoSourceCache: { at: number; source: ResolvedCatalogSource } | null = null
+
+export function invalidateCatalogSourceCache(): void {
+  autoSourceCache = null
+}
+
 export function parseCatalogSourceMode(raw: unknown): CatalogSourceMode {
   if (raw === 'd1' || raw === 'mongo' || raw === 'auto') return raw
   return 'mongo'
@@ -56,14 +63,22 @@ export async function resolveCatalogSourceForEventAsync(event?: H3Event): Promis
 
   if (!mongoAvailable) return 'd1'
 
-  try {
-    const db = getCatalogD1(event)
-    if (!db) return 'mongo'
-    const row = await db.prepare(`SELECT COUNT(*) AS n FROM products`).first<{ n: number }>()
-    if ((row?.n ?? 0) > 0) return 'd1'
-  } catch {
-    return 'mongo'
+  const cached = autoSourceCache
+  if (cached && Date.now() - cached.at < AUTO_SOURCE_TTL_MS) {
+    return cached.source
   }
 
-  return 'mongo'
+  let resolved: ResolvedCatalogSource = 'mongo'
+  try {
+    const db = getCatalogD1(event)
+    if (db) {
+      const row = await db.prepare(`SELECT 1 FROM products LIMIT 1`).first<{ '1': number }>()
+      if (row) resolved = 'd1'
+    }
+  } catch {
+    resolved = 'mongo'
+  }
+
+  autoSourceCache = { at: Date.now(), source: resolved }
+  return resolved
 }
