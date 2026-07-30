@@ -49,12 +49,18 @@ export async function validateCartStock(items: CartItem[]): Promise<StockValidat
                 res: { $sum: '$inv.reserved' },
                 vStock: '$stock',
                 vAvail: '$available',
+                vReserved: { $ifNull: ['$reserved', 0] },
               },
               in: {
                 $cond: [
                   { $gt: ['$$qty', 0] },
                   { $subtract: ['$$qty', '$$res'] },
-                  { $ifNull: ['$$vAvail', { $ifNull: ['$$vStock', 0] }] },
+                  {
+                    $subtract: [
+                      { $ifNull: ['$$vAvail', { $ifNull: ['$$vStock', 0] }] },
+                      '$$vReserved',
+                    ],
+                  },
                 ],
               },
             },

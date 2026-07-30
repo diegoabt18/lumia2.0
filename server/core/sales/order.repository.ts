@@ -61,7 +61,11 @@ async function nextOrderNumber(prefix: string): Promise<string> {
     { $inc: { seq: 1 } },
     { upsert: true, returnDocument: 'after' }
   )
-  const seq = typeof updated?.seq === 'number' ? updated.seq : 1
+  const doc =
+    updated && typeof updated === 'object' && 'seq' in updated
+      ? updated
+      : ((updated as { value?: { seq?: number } | null } | null)?.value ?? null)
+  const seq = typeof doc?.seq === 'number' && doc.seq > 0 ? doc.seq : 1
   return `${prefix}-${year}-${String(seq).padStart(6, '0')}`
 }
 

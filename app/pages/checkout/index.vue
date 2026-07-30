@@ -229,8 +229,17 @@ async function onSubmit() {
       query: { token: result.accessToken },
     })
   } catch (e: unknown) {
-    const err = e as { data?: { message?: string }; message?: string }
-    submitError.value = err?.data?.message || err?.message || 'No se pudo crear el pedido'
+    const err = e as {
+      statusCode?: number
+      data?: { message?: string }
+      message?: string
+      statusMessage?: string
+    }
+    submitError.value =
+      err?.data?.message ||
+      err?.message ||
+      err?.statusMessage ||
+      'No se pudo crear el pedido'
     toast.error(submitError.value)
     turnstileRef.value?.reset()
   } finally {
