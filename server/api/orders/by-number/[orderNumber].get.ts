@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Orden no encontrada' })
   }
 
-  await releaseExpiredOrderStockIfNeeded(order)
+  await releaseExpiredOrderStockIfNeeded(order, event)
   order = (await getOrderByNumber(decoded)) ?? order
   const session = await getSessionFromEvent(event)
   if (session?.userId && order.userId && order.userId === session.userId) {

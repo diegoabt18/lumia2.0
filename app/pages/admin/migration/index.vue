@@ -5,7 +5,9 @@
         <div>
           <h2 class="font-display text-2xl text-lumia-ink">Mongo → D1</h2>
           <p class="mt-2 max-w-2xl text-sm leading-relaxed text-lumia-ink/60">
-            Sincroniza el catálogo de lectura hacia Cloudflare D1. El stock y el carrito siguen en MongoDB.
+            Sincroniza el catálogo hacia Cloudflare D1. Las reservas de stock en checkout se gestionan en D1
+            (columna <code class="rounded bg-lumia-beige/60 px-1">reserved</code>); Mongo sigue siendo la fuente
+            para editar cantidades y re-sync individual.
           </p>
         </div>
         <BaseButton variant="secondary" :disabled="loadingStatus" @click="onRefresh">
@@ -84,6 +86,120 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="rounded-2xl border border-lumia-ink/8 bg-white p-6 shadow-soft">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 class="font-display text-lg text-lumia-ink">Sin stock en D1</h3>
+          <p class="mt-2 max-w-2xl text-sm text-lumia-ink/55">
+            Variantes sin stock vendible en edge (<code class="rounded bg-lumia-beige/60 px-1">available − reserved</code>).
+            Si Mongo aún tiene unidades, aparece como
+            <span class="font-medium text-amber-700">desincronizado</span> — re-sync solo ese producto (no pisa reservas activas).
+          </p>
+        </div>
+        <label class="flex cursor-pointer items-center gap-2 text-sm text-lumia-ink/70">
+          <input v-model="onlyDrift" type="checkbox" class="rounded border-lumia-ink/20" />
+          Solo desincronizados
+        </label>
+      </div>
+
+      <p v-if="loadingOutOfStock" class="mt-4 text-sm text-lumia-ink/50">Cargando productos…</p>
+      <p v-else-if="!canSync" class="mt-4 text-xs text-amber-700">
+        Necesitas D1 conectado y Mongo configurado para ver esta lista.
+      </p>
+      <p v-else-if="!filteredOutOfStock.length" class="mt-4 text-sm text-lumia-ink/50">
+        {{ onlyDrift ? 'Ningún producto desincronizado en esta página.' : 'No hay variantes sin stock en D1.' }}
+      </p>
+
+      <div v-else class="mt-4 overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-lumia-ink/10 text-lumia-ink/50">
+              <th class="py-2 pr-4 font-medium">Producto</th>
+              <th class="py-2 pr-4 font-medium">Variantes (D1 / Mongo)</th>
+              <th class="py-2 pr-4 font-medium">Última sync</th>
+              <th class="py-2 font-medium">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in filteredOutOfStock"
+              :key="item.slug"
+              class="border-b border-lumia-ink/5 align-top"
+            >
+              <td class="py-3 pr-4">
+                <div class="flex items-start gap-3">
+                  <div class="flex flex-col gap-1">
+                    <NuxtLink
+                      :to="`/products/${item.slug}`"
+                      class="font-medium text-lumia-ink hover:text-lumia-gold"
+                      target="_blank"
+                    >
+                      {{ item.name }}
+                    </NuxtLink>
+                    <span class="text-xs text-lumia-ink/45">{{ item.slug }}</span>
+                    <span
+                      v-if="item.needsSync"
+                      class="mt-1 inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                    >
+                      Desincronizado
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td class="py-3 pr-4 text-xs text-lumia-ink/70">
+                <ul class="space-y-1">
+                  <li v-for="variant in item.variants" :key="variant.sku">
+                    <span class="font-mono">{{ variant.sku }}</span>
+                    <span class="tabular-nums">
+                      · D1 {{ formatStock(variant.d1Available ?? variant.d1Stock) }}
+                      · Mongo {{ formatStock(variant.mongoAvailable) }}
+                    </span>
+                  </li>
+                </ul>
+              </td>
+              <td class="py-3 pr-4 whitespace-nowrap text-lumia-ink/55">
+                {{ item.syncedAt ? formatDate(item.syncedAt) : '—' }}
+              </td>
+              <td class="py-3">
+                <BaseButton
+                  variant="secondary"
+                  :disabled="Boolean(syncingProductSlug) || !canSync"
+                  @click="onSyncProduct(item.slug)"
+                >
+                  {{ syncingProductSlug === item.slug ? 'Sync…' : 'Sync producto' }}
+                </BaseButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        v-if="canSync && outOfStockTotal > outOfStockLimit"
+        class="mt-4 flex flex-wrap items-center justify-between gap-3"
+      >
+        <p class="text-xs text-lumia-ink/50">
+          {{ outOfStockTotal }} productos con variantes sin stock
+        </p>
+        <div class="flex gap-2">
+          <BaseButton
+            variant="ghost"
+            :disabled="outOfStockPage <= 1 || loadingOutOfStock"
+            @click="onOutOfStockPage(outOfStockPage - 1)"
+          >
+            Anterior
+          </BaseButton>
+          <BaseButton
+            variant="ghost"
+            :disabled="outOfStockPage * outOfStockLimit >= outOfStockTotal || loadingOutOfStock"
+            @click="onOutOfStockPage(outOfStockPage + 1)"
+          >
+            Siguiente
+          </BaseButton>
+        </div>
       </div>
     </section>
 
@@ -207,6 +323,11 @@ const {
   status,
   history,
   lastResult,
+  outOfStock,
+  outOfStockTotal,
+  outOfStockPage,
+  loadingOutOfStock,
+  syncingProductSlug,
   loadingStatus,
   loadingHistory,
   runningAction,
@@ -215,10 +336,19 @@ const {
   targetLabel,
   refreshStatus,
   refreshHistory,
+  refreshOutOfStock,
   dryRun,
   syncFull,
   syncTarget,
+  syncProduct,
 } = useMigrationAdmin()
+
+const onlyDrift = ref(false)
+const outOfStockLimit = 20
+
+const filteredOutOfStock = computed(() =>
+  onlyDrift.value ? outOfStock.value.filter((item) => item.needsSync) : outOfStock.value
+)
 
 const canSync = computed(
   () => Boolean(status.value?.mongoConfigured && status.value?.d1Bound && status.value?.d1Connected)
@@ -290,7 +420,21 @@ function statusClass(s: MigrationStatus) {
 }
 
 async function onRefresh() {
-  await Promise.all([refreshStatus(), refreshHistory()])
+  await Promise.all([refreshStatus(), refreshHistory(), refreshOutOfStock()])
+}
+
+async function onOutOfStockPage(page: number) {
+  await refreshOutOfStock(page, outOfStockLimit)
+}
+
+async function onSyncProduct(slug: string) {
+  if (!confirm(`¿Sincronizar "${slug}" desde Mongo hacia D1?`)) return
+  await syncProduct(slug)
+}
+
+function formatStock(value: number | null | undefined) {
+  if (value == null) return '—'
+  return String(value)
 }
 
 async function onDryRunFull() {

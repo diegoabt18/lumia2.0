@@ -94,3 +94,36 @@ export function parseMigrationTarget(raw: string | undefined): MigrationTarget |
   if (!raw) return null
   return MIGRATION_TARGETS.includes(raw as MigrationTarget) ? (raw as MigrationTarget) : null
 }
+
+export interface OutOfStockVariantRow {
+  sku: string
+  d1Stock: number | null
+  d1Available: number | null
+  mongoAvailable: number | null
+  isMadeToOrder: boolean
+}
+
+export interface OutOfStockProductItem {
+  slug: string
+  name: string
+  imagePath: string | null
+  categorySlug: string | null
+  syncedAt: string | null
+  variants: OutOfStockVariantRow[]
+  /** Mongo tiene stock pero D1 muestra 0 — candidato a re-sync */
+  needsSync: boolean
+}
+
+export interface OutOfStockListResponse {
+  items: OutOfStockProductItem[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface ProductSyncResult {
+  slug: string
+  rowsWritten: number
+  product: { name: string }
+  variants: Array<{ sku: string; stock: number | null; available: number | null }>
+}

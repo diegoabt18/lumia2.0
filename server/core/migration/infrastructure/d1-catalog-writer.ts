@@ -206,6 +206,143 @@ export async function replaceOptions(
   return axes.length + values.length + legacy.length
 }
 
+export async function replaceOptionsForProduct(
+  session: CatalogD1DatabaseSession,
+  productSlug: string,
+  axes: D1OptionAxisRow[],
+  values: D1OptionValueRow[],
+  legacy: D1LegacyOptionRow[]
+): Promise<number> {
+  const existing = await session
+    .prepare('SELECT id FROM product_option_axes WHERE product_slug = ?')
+    .bind(productSlug)
+    .all<{ id: string }>()
+
+  const axisIds = (existing.results ?? []).map((row) => row.id)
+  if (axisIds.length) {
+    const placeholders = axisIds.map(() => '?').join(', ')
+    await session
+      .prepare(`DELETE FROM product_option_values WHERE axis_id IN (${placeholders})`)
+      .bind(...axisIds)
+      .run()
+  }
+
+  await session.prepare('DELETE FROM product_option_axes WHERE product_slug = ?').bind(productSlug).run()
+  await session
+    .prepare('DELETE FROM product_options_legacy WHERE product_slug = ?')
+    .bind(productSlug)
+    .run()
+
+  const axisStatements = axes.map((row) =>
+    session
+      .prepare(
+        `INSERT INTO product_option_axes (id, product_slug, product_mongo_id, name, position, synced_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .bind(row.id, row.productSlug, row.productMongoId, row.name, row.position, row.syncedAt)
+  )
+  await runStatements(session, axisStatements)
+
+  const valueStatements = values.map((row) =>
+    session
+      .prepare(
+        `INSERT INTO product_option_values (id, axis_id, value, slug, position, synced_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .bind(row.id, row.axisId, row.value, row.slug, row.position, row.syncedAt)
+  )
+  await runStatements(session, valueStatements)
+
+  const legacyStatements = legacy.map((row) =>
+    session
+      .prepare(
+        `INSERT INTO product_options_legacy (product_slug, name, values_json, synced_at)
+         VALUES (?, ?, ?, ?)`
+      )
+      .bind(row.productSlug, row.name, row.valuesJson, row.syncedAt)
+  )
+  await runStatements(session, legacyStatements)
+
+  return axes.length + values.length + legacy.length
+}
+
+export interface D1OutOfStockRow {
+  slug: string
+  name: string
+  image_path: string | null
+  category_slug: string | null
+  synced_at: string | null
+  sku: string
+  stock: number | null
+  available: number | null
+  reserved: number
+  is_per_order: number
+}
+
+export async function countOutOfStockProducts(
+  session: CatalogD1DatabaseSession,
+  hasReserved = false
+): Promise<number> {
+  const sellableZero = hasReserved
+    ? `(COALESCE(v.available, v.stock, 0) - COALESCE(v.reserved, 0)) <= 0`
+    : `COALESCE(v.available, v.stock, 0) <= 0`
+
+  const row = await session
+    .prepare(
+      `SELECT COUNT(DISTINCT p.slug) AS n
+       FROM products p
+       INNER JOIN variants v ON v.product_slug = p.slug
+       WHERE p.status != 'inactive'
+         AND v.is_per_order = 0
+         AND ${sellableZero}`
+    )
+    .first<{ n: number }>()
+  return row?.n ?? 0
+}
+
+export async function listOutOfStockRows(
+  session: CatalogD1DatabaseSession,
+  limit: number,
+  offset: number,
+  hasReserved = false
+): Promise<D1OutOfStockRow[]> {
+  const sellableZero = hasReserved
+    ? `(COALESCE(v.available, v.stock, 0) - COALESCE(v.reserved, 0)) <= 0`
+    : `COALESCE(v.available, v.stock, 0) <= 0`
+  const sellableZero2 = hasReserved
+    ? `(COALESCE(v2.available, v2.stock, 0) - COALESCE(v2.reserved, 0)) <= 0`
+    : `COALESCE(v2.available, v2.stock, 0) <= 0`
+  const reservedCol = hasReserved ? 'COALESCE(v.reserved, 0) AS reserved' : '0 AS reserved'
+
+  const result = await session
+    .prepare(
+      `SELECT p.slug, p.name, p.image_path, p.category_slug, p.synced_at,
+              v.sku, v.stock, v.available, ${reservedCol}, v.is_per_order
+       FROM products p
+       INNER JOIN variants v ON v.product_slug = p.slug
+       WHERE p.status != 'inactive'
+         AND v.is_per_order = 0
+         AND ${sellableZero}
+         AND p.slug IN (
+           SELECT slug FROM (
+             SELECT DISTINCT p2.slug AS slug, p2.name AS sort_name
+             FROM products p2
+             INNER JOIN variants v2 ON v2.product_slug = p2.slug
+             WHERE p2.status != 'inactive'
+               AND v2.is_per_order = 0
+               AND ${sellableZero2}
+             ORDER BY sort_name COLLATE NOCASE
+             LIMIT ? OFFSET ?
+           )
+         )
+       ORDER BY p.name COLLATE NOCASE, v.sku`
+    )
+    .bind(limit, offset)
+    .all<D1OutOfStockRow>()
+
+  return result.results ?? []
+}
+
 export async function countD1CatalogEntities(session: CatalogD1DatabaseSession): Promise<{
   categories: number
   products: number

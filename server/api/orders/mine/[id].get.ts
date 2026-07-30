@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Orden no encontrada' })
   }
 
-  await releaseExpiredOrderStockIfNeeded(order)
+  await releaseExpiredOrderStockIfNeeded(order, event)
   order = (await getOrderByIdForUser(orderId, session.userId)) ?? order
 
   return toPublicOrder(order)

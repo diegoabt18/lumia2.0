@@ -1,11 +1,18 @@
+import type { H3Event } from 'h3'
 import type { Db, ObjectId } from 'mongodb'
 import type { CartItem } from '#shared/types/product'
 import type { VariantDoc } from '../catalog/infrastructure/product.repository'
+import {
+  commitD1StockReservations,
+  isD1StockAvailable,
+  releaseD1StockReservations,
+  reserveCartStockD1,
+} from './d1-stock-reservation'
 
 export interface StockReservationLine {
   sku: string
   quantity: number
-  source: 'inventory' | 'variant'
+  source: 'inventory' | 'variant' | 'd1'
   inventoryId?: ObjectId
 }
 
@@ -83,7 +90,6 @@ async function reserveVariantSku(db: Db, sku: string, quantity: number): Promise
   return { sku, quantity, source: 'variant' }
 }
 
-/** Fase 2a — Reservas de variantes en paralelo (SKUs distintos). */
 async function parallelReserveVariants(
   db: Db,
   lines: Array<{ sku: string; quantity: number; productName: string }>
@@ -100,7 +106,7 @@ async function parallelReserveVariants(
   const reservations: StockReservationLine[] = []
   for (const { line, row } of settled) {
     if (!row) {
-      await releaseCartStockReservations(reservations)
+      await releaseMongoStockReservations(reservations)
       throw createError({
         statusCode: 409,
         message: `${line.productName}: el stock cambió mientras confirmabas. Revisa tu carrito.`,
@@ -165,12 +171,7 @@ async function reserveInventorySku(
   return reservations
 }
 
-/**
- * Reserva stock:
- * 1. Lecturas paralelas (variants + inventory)
- * 2. Escrituras variantes en paralelo; inventario en serie por SKU
- */
-export async function reserveCartStock(items: CartItem[]): Promise<StockReservationLine[]> {
+async function reserveCartStockMongo(items: CartItem[]): Promise<StockReservationLine[]> {
   const { isCatalogDbConfigured, getCatalogDb } = await import('../../database/catalog')
   if (!isCatalogDbConfigured() || !items.length) return []
 
@@ -208,21 +209,35 @@ export async function reserveCartStock(items: CartItem[]): Promise<StockReservat
 
     return reservations
   } catch (e) {
-    await releaseCartStockReservations(reservations)
+    await releaseMongoStockReservations(reservations)
     throw e
   }
 }
 
-/** Libera reservas en paralelo si falla la creación del pedido. */
-export async function releaseCartStockReservations(lines: StockReservationLine[]): Promise<void> {
-  if (!lines.length) return
+/**
+ * Reserva stock en checkout.
+ * Prioriza D1 (edge) si CATALOG_DB está bound; si no, Mongo catalog_db (legacy).
+ */
+export async function reserveCartStock(
+  items: CartItem[],
+  event?: H3Event
+): Promise<StockReservationLine[]> {
+  if (event && (await isD1StockAvailable(event))) {
+    return reserveCartStockD1(items, event)
+  }
+  return reserveCartStockMongo(items)
+}
+
+async function releaseMongoStockReservations(lines: StockReservationLine[]): Promise<void> {
+  const mongoLines = lines.filter((line) => line.source !== 'd1')
+  if (!mongoLines.length) return
 
   const { isCatalogDbConfigured, getCatalogDb } = await import('../../database/catalog')
   if (!isCatalogDbConfigured()) return
 
   const db = await getCatalogDb()
   await Promise.all(
-    lines.map(async (line) => {
+    mongoLines.map(async (line) => {
       if (line.source === 'inventory' && line.inventoryId) {
         await db
           .collection('inventory_items')
@@ -234,4 +249,59 @@ export async function releaseCartStockReservations(lines: StockReservationLine[]
       }
     })
   )
+}
+
+async function commitMongoStockReservations(lines: StockReservationLine[]): Promise<void> {
+  const mongoLines = lines.filter((line) => line.source !== 'd1')
+  if (!mongoLines.length) return
+
+  const { isCatalogDbConfigured, getCatalogDb } = await import('../../database/catalog')
+  if (!isCatalogDbConfigured()) return
+
+  const db = await getCatalogDb()
+  for (const line of mongoLines) {
+    if (line.source === 'inventory' && line.inventoryId) {
+      await db.collection('inventory_items').updateOne(
+        { _id: line.inventoryId },
+        { $inc: { quantity: -line.quantity, reserved: -line.quantity } }
+      )
+      continue
+    }
+    if (line.source === 'variant') {
+      await db.collection('variants').updateOne(
+        { sku: line.sku },
+        {
+          $inc: {
+            reserved: -line.quantity,
+            stock: -line.quantity,
+            available: -line.quantity,
+          },
+        }
+      )
+    }
+  }
+}
+
+/** Libera reservas (D1 o Mongo según origen de cada línea). */
+export async function releaseCartStockReservations(
+  lines: StockReservationLine[],
+  event?: H3Event
+): Promise<void> {
+  if (!lines.length) return
+  await Promise.all([
+    releaseD1StockReservations(lines, event),
+    releaseMongoStockReservations(lines),
+  ])
+}
+
+/** Confirma venta: baja stock real y libera reservas. */
+export async function commitCartStockReservations(
+  lines: StockReservationLine[],
+  event?: H3Event
+): Promise<void> {
+  if (!lines.length) return
+  await Promise.all([
+    commitD1StockReservations(lines, event),
+    commitMongoStockReservations(lines),
+  ])
 }

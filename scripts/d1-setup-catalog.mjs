@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const wranglerPath = path.join(root, 'wrangler.jsonc')
 const schemaPath = path.join(root, 'scripts/migrations/001_catalog_schema.sql')
+const schema002Path = path.join(root, 'scripts/migrations/002_variant_reserved.sql')
 
 function run(cmd, args) {
   const result = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' })
@@ -35,6 +36,9 @@ console.log('== Lumia D1 catalog — Fase 0 ==\n')
 console.log('→ Aplicando schema local (001_catalog_schema.sql)...')
 run('npx', ['wrangler', 'd1', 'execute', 'lumia-catalog', '--local', '--file', schemaPath])
 
+console.log('→ Aplicando migración 002 (stock reserved en edge)...')
+run('npx', ['wrangler', 'd1', 'execute', 'lumia-catalog', '--local', '--file', schema002Path])
+
 const create = spawnSync(
   'npx',
   ['wrangler', 'd1', 'create', 'lumia-catalog'],
@@ -53,7 +57,8 @@ if (create.status === 0) {
 
 console.log(`
 Próximos pasos manuales:
-  1. npm run db:d1:migrate:remote     # schema en Cloudflare
+  1. npm run db:d1:migrate:remote     # schema 001 en Cloudflare
+  1b. npm run db:d1:migrate:002:remote  # columna reserved (stock edge)
   2. Dashboard → D1 → lumia-catalog → Settings → Enable Read Replication
   3. npm run cf:types                 # tipos del binding CATALOG_DB
   4. Cuando el sync esté listo (Fase 1+): NUXT_CATALOG_SOURCE=auto o d1

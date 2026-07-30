@@ -26,7 +26,9 @@
     "db:indexes": "node scripts/ensure-atlas-indexes.mjs",
     "db:d1:create": "wrangler d1 create lumia-catalog",
     "db:d1:migrate": "wrangler d1 execute lumia-catalog --local --file=scripts/migrations/001_catalog_schema.sql",
+    "db:d1:migrate:002": "wrangler d1 execute lumia-catalog --local --file=scripts/migrations/002_variant_reserved.sql",
     "db:d1:migrate:remote": "wrangler d1 execute lumia-catalog --remote --file=scripts/migrations/001_catalog_schema.sql",
+    "db:d1:migrate:002:remote": "wrangler d1 execute lumia-catalog --remote --file=scripts/migrations/002_variant_reserved.sql",
     "db:d1:setup": "node scripts/d1-setup-catalog.mjs"
   },
   "dependencies": {

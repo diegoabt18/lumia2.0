@@ -7,6 +7,17 @@ import { resolveCartSubjectForWrite } from '../../utils/cart-context'
 import { checkRateLimit } from '../../utils/rate-limit'
 import { formatVariantLabel } from '#shared/variant-label'
 import type { VariantDoc } from '../../core/catalog/infrastructure/product.repository'
+import { resolveCatalogSourceForEventAsync } from '../../utils/catalog-source'
+import { getVariantStockRowD1, computeSellableUnits } from '../../core/sales/d1-stock-reservation'
+
+function parseOptionsJson(raw: string | null): Record<string, string> {
+  if (!raw) return {}
+  try {
+    return JSON.parse(raw) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
 
 const cartItemSnapshotSchema = z.object({
   productSlug: z.string().trim().min(1).max(120),
@@ -38,6 +49,38 @@ export default defineEventHandler(async (event) => {
     }
 
     const { sku, quantity = 1, product: snapshot } = parsed.data
+    const catalogSource = await resolveCatalogSourceForEventAsync(event)
+
+    if (catalogSource === 'd1') {
+      const row = await getVariantStockRowD1(event, sku)
+      if (!row) throw createError({ statusCode: 404, message: 'Variant not found' })
+      if (typeof row.price !== 'number' || !Number.isFinite(row.price)) {
+        throw createError({ statusCode: 422, message: 'Precio de producto no disponible' })
+      }
+
+      const isMadeToOrder = row.is_per_order === 1
+      const sellable = computeSellableUnits(row)
+      const available = isMadeToOrder ? 99 : (sellable ?? 0)
+
+      if (!isMadeToOrder && available <= 0) throw createError({ statusCode: 409, message: 'Sin stock' })
+
+      const finalQty = isMadeToOrder ? quantity : Math.min(quantity, available)
+      const options = parseOptionsJson(row.options_json)
+
+      await addCartItem(subject.cartKey, {
+        sku: row.sku,
+        productSlug: snapshot?.productSlug ?? row.product_slug,
+        productName: snapshot?.productName ?? row.sku,
+        variantLabel: snapshot?.variantLabel ?? formatVariantLabel(options, row.sku),
+        quantity: finalQty,
+        unitPrice: row.price,
+        currency: snapshot?.currency ?? row.currency ?? 'COP',
+        imagePath: snapshot?.imagePath ?? row.image_path ?? null,
+      })
+
+      const cart = await buildCartApiResponse(subject.cartKey)
+      return { ok: true, ...cart, source: 'd1' as const }
+    }
 
     if (!isCatalogDbConfigured()) {
       throw createError({ statusCode: 503, message: 'Catálogo no disponible' })

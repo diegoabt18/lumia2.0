@@ -4,6 +4,9 @@ import type {
   MigrationSyncResult,
   MigrationTarget,
   MigrationStatusResponse,
+  OutOfStockListResponse,
+  OutOfStockProductItem,
+  ProductSyncResult,
 } from '#shared/types/migration'
 import { SYNC_TARGET_ORDER } from '#shared/types/migration'
 import { createMigrationWriteSession, requireCatalogMongo, requireCatalogD1 } from '../../../utils/require-migration'
@@ -21,14 +24,21 @@ import {
 } from '../infrastructure/catalog-transformer'
 import {
   countD1CatalogEntities,
+  listOutOfStockRows,
+  countOutOfStockProducts,
   replaceOptions,
+  replaceOptionsForProduct,
   setMigrationMeta,
   upsertCategories,
   upsertProducts,
   upsertPromotions,
   upsertVariants,
 } from '../infrastructure/d1-catalog-writer'
-import { loadMongoCatalogSnapshot, countMongoCatalogEntities } from '../infrastructure/mongo-catalog-source'
+import {
+  loadMongoCatalogSnapshot,
+  countMongoCatalogEntities,
+  loadMongoProductBySlug,
+} from '../infrastructure/mongo-catalog-source'
 import {
   createMigrationLog,
   finishMigrationLog,
@@ -43,6 +53,11 @@ import {
   getConfiguredCatalogSourceMode,
   resolveCatalogSourceForEventAsync,
 } from '../../../utils/catalog-source'
+import { resolveVariantStockQuantities } from '../../catalog/application/resolve-variant-stock'
+import { loadInventoryForSkus } from '../../catalog/infrastructure/inventory-summary.repository'
+import type { VariantDoc } from '../../catalog/infrastructure/product.repository'
+import { getCatalogDb } from '../../../database/catalog'
+import { getD1SchemaInfo } from '../../../utils/d1-schema'
 
 export interface SyncOptions {
   dryRun?: boolean
@@ -276,3 +291,150 @@ export async function getMigrationStatus(event: H3Event): Promise<MigrationStatu
 }
 
 export { getMigrationLog, listMigrationLogs }
+
+async function loadMongoAvailableBySku(skus: string[]): Promise<Map<string, number | null>> {
+  if (!skus.length || !isCatalogDbConfigured()) return new Map()
+
+  const db = await getCatalogDb()
+  const variants = await db
+    .collection<VariantDoc>('variants')
+    .find({ sku: { $in: skus } })
+    .project({ sku: 1, stock: 1, available: 1, reserved: 1, is_per_order: 1 })
+    .toArray()
+  const inventoryBySku = await loadInventoryForSkus(db, skus)
+
+  const map = new Map<string, number | null>()
+  for (const variant of variants) {
+    const { available } = resolveVariantStockQuantities(variant, inventoryBySku.get(variant.sku))
+    map.set(variant.sku, available)
+  }
+  return map
+}
+
+export async function listOutOfStockProducts(
+  event: H3Event,
+  options: { page?: number; limit?: number } = {}
+): Promise<OutOfStockListResponse> {
+  const page = Math.max(1, options.page ?? 1)
+  const limit = Math.min(50, Math.max(1, options.limit ?? 20))
+  const offset = (page - 1) * limit
+
+  requireCatalogD1(event)
+  const session = createMigrationWriteSession(event)
+  const { hasReserved } = await getD1SchemaInfo(event)
+
+  const [total, rows] = await Promise.all([
+    countOutOfStockProducts(session, hasReserved),
+    listOutOfStockRows(session, limit, offset, hasReserved),
+  ])
+
+  const skus = rows.map((row) => row.sku)
+  const mongoAvailableBySku = await loadMongoAvailableBySku(skus)
+
+  const bySlug = new Map<string, OutOfStockProductItem>()
+  for (const row of rows) {
+    const d1Base = row.available ?? row.stock ?? 0
+    const d1Sellable = Math.max(0, d1Base - (row.reserved ?? 0))
+    const mongoAvailable = mongoAvailableBySku.get(row.sku) ?? null
+    const variant = {
+      sku: row.sku,
+      d1Stock: row.stock,
+      d1Available: d1Sellable,
+      mongoAvailable,
+      isMadeToOrder: row.is_per_order === 1,
+    }
+
+    let item = bySlug.get(row.slug)
+    if (!item) {
+      item = {
+        slug: row.slug,
+        name: row.name,
+        imagePath: row.image_path,
+        categorySlug: row.category_slug,
+        syncedAt: row.synced_at,
+        variants: [],
+        needsSync: false,
+      }
+      bySlug.set(row.slug, item)
+    }
+    item.variants.push(variant)
+    if ((mongoAvailable ?? 0) > 0 && d1Sellable <= 0) {
+      item.needsSync = true
+    }
+  }
+
+  const items = [...bySlug.values()]
+
+  return {
+    items,
+    total,
+    page,
+    limit,
+  }
+}
+
+export async function syncProductBySlug(
+  event: H3Event,
+  slug: string,
+  options: { triggeredBy?: string | null } = {}
+): Promise<ProductSyncResult> {
+  requireCatalogMongo()
+  requireCatalogD1(event)
+
+  const normalized = slug.trim()
+  if (!normalized) {
+    throw createError({ statusCode: 400, message: 'Slug de producto requerido' })
+  }
+
+  const bundle = await loadMongoProductBySlug(normalized)
+  if (!bundle) {
+    throw createError({ statusCode: 404, message: `Producto "${normalized}" no encontrado en MongoDB` })
+  }
+
+  const session = createMigrationWriteSession(event)
+  let rowsWritten = 0
+
+  if (bundle.category) {
+    const db = await getCatalogDb()
+    const productCount = bundle.product.category_slug
+      ? await db.collection('products').countDocuments({
+          category_slug: bundle.product.category_slug,
+          status: { $ne: 'inactive' },
+        })
+      : 0
+    const categoryRows = transformCategories([bundle.category], new Map([[bundle.category.slug, productCount]]))
+    rowsWritten += await upsertCategories(session, categoryRows)
+  }
+
+  const productRows = transformProducts([bundle.product])
+  rowsWritten += await upsertProducts(session, productRows)
+
+  const variantRows = transformVariants(bundle.variants, bundle.inventoryBySku)
+  rowsWritten += await upsertVariants(session, variantRows)
+
+  const slugByMongoId = buildSlugByMongoId([bundle.product])
+  const axes = transformOptionAxes(bundle.optionAxes, slugByMongoId)
+  const axisIds = new Set(axes.map((a) => a.id))
+  const values = transformOptionValues(bundle.optionValues, axisIds)
+  const legacy = transformLegacyOptions(bundle.legacyOptions)
+  rowsWritten += await replaceOptionsForProduct(session, normalized, axes, values, legacy)
+
+  await setMigrationMeta(session, 'last_sync_at', new Date().toISOString())
+  await setMigrationMeta(session, 'last_sync_target', `product:${normalized}`)
+  if (options.triggeredBy) {
+    await setMigrationMeta(session, 'last_sync_by', options.triggeredBy)
+  }
+
+  invalidateCatalogCaches()
+
+  return {
+    slug: normalized,
+    rowsWritten,
+    product: { name: bundle.product.name },
+    variants: variantRows.map((row) => ({
+      sku: row.sku,
+      stock: row.stock,
+      available: row.available,
+    })),
+  }
+}

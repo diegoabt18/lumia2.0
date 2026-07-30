@@ -100,7 +100,7 @@ export default defineEventHandler(async (event) => {
 
     const [{ subject, session }] = await Promise.all([
       resolveCheckoutContext(event),
-      warmCheckoutMongo({ reserveStock }),
+      warmCheckoutMongo({ reserveStock, event }),
     ]).then(([ctx]) => [ctx] as const)
 
     const idempotencyKey = readIdempotencyKey(event)
@@ -152,7 +152,7 @@ export default defineEventHandler(async (event) => {
           throw createError({ statusCode: 400, message: 'El carrito está vacío' })
         }
 
-        const reservations = reserveStock ? await reserveCartStock(items) : []
+        const reservations = reserveStock ? await reserveCartStock(items, event) : []
         const orderSubtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
         const shippingQuote = quoteStoreShipping(orderSubtotal)
 
@@ -203,7 +203,7 @@ export default defineEventHandler(async (event) => {
           return { cartItems: items, response }
         } catch (e) {
           if (reservations.length) {
-            await releaseCartStockReservations(reservations).catch((err) => {
+            await releaseCartStockReservations(reservations, event).catch((err) => {
               console.warn('[orders/create] release reservations failed', (err as Error)?.message)
             })
           }
@@ -213,6 +213,11 @@ export default defineEventHandler(async (event) => {
       CHECKOUT_MONGO_TIMEOUT_MS,
       'checkout mongo pipeline'
     )
+
+    if (reserveStock && checkoutResult.response.orderNumber) {
+      const { invalidateCatalogCaches } = await import('../../utils/catalog-cache')
+      invalidateCatalogCaches()
+    }
 
     if (subject.kind === 'guest' && getGuestCartKeyFromEvent(event)) {
       clearGuestCartCookie(event)

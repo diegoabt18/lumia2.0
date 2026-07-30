@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Orden no encontrada' })
   }
 
-  await releaseExpiredOrderStockIfNeeded(order)
+  await releaseExpiredOrderStockIfNeeded(order, event)
 
   return toPublicOrder(order)
 })

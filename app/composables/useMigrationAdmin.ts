@@ -3,6 +3,9 @@ import type {
   MigrationStatusResponse,
   MigrationSyncResult,
   MigrationTarget,
+  OutOfStockListResponse,
+  OutOfStockProductItem,
+  ProductSyncResult,
 } from '#shared/types/migration'
 import { SYNC_TARGET_ORDER } from '#shared/types/migration'
 
@@ -22,6 +25,11 @@ export function useMigrationAdmin() {
   const loadingHistory = ref(false)
   const runningAction = ref<string | null>(null)
   const error = ref<string | null>(null)
+  const outOfStock = ref<OutOfStockProductItem[]>([])
+  const outOfStockTotal = ref(0)
+  const outOfStockPage = ref(1)
+  const loadingOutOfStock = ref(false)
+  const syncingProductSlug = ref<string | null>(null)
 
   async function refreshStatus() {
     loadingStatus.value = true
@@ -80,6 +88,43 @@ export function useMigrationAdmin() {
     )
   }
 
+  async function refreshOutOfStock(page = outOfStockPage.value, limit = 20) {
+    loadingOutOfStock.value = true
+    try {
+      const res = await $fetch<OutOfStockListResponse & { ok: boolean }>(
+        '/api/admin/migration/out-of-stock',
+        { query: { page, limit } }
+      )
+      outOfStock.value = res.items
+      outOfStockTotal.value = res.total
+      outOfStockPage.value = res.page
+    } catch {
+      outOfStock.value = []
+      outOfStockTotal.value = 0
+    } finally {
+      loadingOutOfStock.value = false
+    }
+  }
+
+  async function syncProduct(slug: string) {
+    syncingProductSlug.value = slug
+    error.value = null
+    try {
+      const res = await $fetch<{ ok: boolean; result: ProductSyncResult }>(
+        `/api/admin/migration/product/${encodeURIComponent(slug)}`,
+        { method: 'POST' }
+      )
+      await Promise.all([refreshStatus(), refreshOutOfStock()])
+      return res.result
+    } catch (e: unknown) {
+      const err = e as { data?: { message?: string }; message?: string }
+      error.value = err.data?.message ?? err.message ?? 'No se pudo sincronizar el producto'
+      throw e
+    } finally {
+      syncingProductSlug.value = null
+    }
+  }
+
   async function runAction<T extends { result: MigrationSyncResult }>(
     key: string,
     call: () => Promise<T>
@@ -109,6 +154,11 @@ export function useMigrationAdmin() {
     status,
     history,
     lastResult,
+    outOfStock,
+    outOfStockTotal,
+    outOfStockPage,
+    loadingOutOfStock,
+    syncingProductSlug,
     loadingStatus,
     loadingHistory,
     runningAction,
@@ -117,8 +167,10 @@ export function useMigrationAdmin() {
     targetLabel,
     refreshStatus,
     refreshHistory,
+    refreshOutOfStock,
     dryRun,
     syncFull,
     syncTarget,
+    syncProduct,
   }
 }

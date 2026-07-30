@@ -10,6 +10,9 @@ import { loadTopSellingSlugsOnSession } from './category-d1.repository'
 import { getCatalogReadSession, persistCatalogBookmark } from './d1-session'
 import { findActivePromotionsOnSession } from './promotion-d1.repository'
 import type { CatalogSort } from '../catalog-listing'
+import type { CatalogD1DatabaseSession } from '../../../database/catalog-d1'
+import { computeSellableUnits } from '../../sales/d1-stock-reservation'
+import { getD1SchemaInfo, variantSelectSql } from '../../../utils/d1-schema'
 
 interface ProductD1Row {
   slug: string
@@ -36,6 +39,7 @@ interface VariantD1Row {
   image_path: string | null
   stock: number | null
   available: number | null
+  reserved: number | null
   is_per_order: number
   option_rules_json: string | null
   option_value_ids_json: string | null
@@ -51,8 +55,8 @@ function parseJson<T>(raw: string | null): T | null {
 }
 
 function mapVariant(row: VariantD1Row): ProductVariant {
-  const available = typeof row.available === 'number' ? row.available : undefined
-  const quantity = typeof row.stock === 'number' ? row.stock : available
+  const sellable = computeSellableUnits(row)
+  const baseStock = typeof row.stock === 'number' ? row.stock : row.available ?? undefined
   const optionRules = parseJson<Array<{ optionId: string; allowedValueIds: string[] }>>(
     row.option_rules_json
   )
@@ -67,9 +71,9 @@ function mapVariant(row: VariantD1Row): ProductVariant {
     compareAtPrice: row.compare_at_price ?? undefined,
     salePrice: row.price,
     currency: row.currency ?? 'COP',
-    quantity,
-    stock: quantity,
-    available,
+    quantity: sellable ?? baseStock,
+    stock: baseStock,
+    available: sellable ?? (typeof row.available === 'number' ? row.available : undefined),
     imagePath: row.image_path ?? null,
     isMadeToOrder: row.is_per_order === 1,
   }
@@ -233,6 +237,9 @@ export async function listProductsPageD1(
   const orderBy = buildProductListOrderBy(options.sort)
 
   const now = new Date()
+  const { hasReserved } = await getD1SchemaInfo(event)
+  const variantCols = variantSelectSql(hasReserved)
+
   const [productResult, countRow, topSlugs, promotions] = await Promise.all([
     session
       .prepare(
@@ -261,8 +268,7 @@ export async function listProductsPageD1(
     const placeholders = slugs.map(() => '?').join(', ')
     const { results } = await session
       .prepare(
-        `SELECT sku, product_slug, price, compare_at_price, currency, options_json, image_path,
-                stock, available, is_per_order, option_rules_json, option_value_ids_json
+        `SELECT ${variantCols}
          FROM variants
          WHERE product_slug IN (${placeholders})
          ORDER BY product_slug ASC, price ASC`
@@ -290,6 +296,8 @@ export async function listProductsPageD1(
 export async function getProductBySlugD1(event: H3Event, slug: string): Promise<Product | null> {
   const { applyPromotionsToProduct } = await import('../../pricing/apply-product-promotions')
   const session = getCatalogReadSession(event)
+  const { hasReserved } = await getD1SchemaInfo(event)
+  const variantCols = variantSelectSql(hasReserved)
 
   const [productRow, variantResult, topSlugs, promotions] = await Promise.all([
     session
@@ -304,8 +312,7 @@ export async function getProductBySlugD1(event: H3Event, slug: string): Promise<
       .first<ProductD1Row>(),
     session
       .prepare(
-        `SELECT sku, product_slug, price, compare_at_price, currency, options_json, image_path,
-                stock, available, is_per_order, option_rules_json, option_value_ids_json
+        `SELECT ${variantCols}
          FROM variants
          WHERE product_slug = ?
          ORDER BY price ASC`

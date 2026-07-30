@@ -2,7 +2,7 @@ import type { PromotionEntity } from '../../catalog/domain/promotion'
 import type { CategoryDoc } from '../../catalog/infrastructure/category.repository'
 import type { ProductDoc, VariantDoc } from '../../catalog/infrastructure/product.repository'
 import type { InventorySummary } from '../../catalog/application/resolve-variant-stock'
-import { loadInventoryBySku } from '../../catalog/infrastructure/inventory-summary.repository'
+import { loadInventoryBySku, loadInventoryForSkus } from '../../catalog/infrastructure/inventory-summary.repository'
 
 export interface MongoOptionAxisDoc {
   _id?: { toString(): string }
@@ -106,4 +106,56 @@ export async function countMongoCatalogEntities(): Promise<{
     ])
 
   return { categories, products, variants, promotions, optionAxes, optionValues, legacyOptions }
+}
+
+export interface MongoProductBundle {
+  product: ProductDoc
+  variants: VariantDoc[]
+  optionAxes: MongoOptionAxisDoc[]
+  optionValues: MongoOptionValueDoc[]
+  legacyOptions: MongoLegacyOptionDoc[]
+  inventoryBySku: Map<string, InventorySummary>
+  category: CategoryDoc | null
+}
+
+export async function loadMongoProductBySlug(slug: string): Promise<MongoProductBundle | null> {
+  const db = await getDb()
+  const product = await db.collection<ProductDoc>('products').findOne({ slug })
+  if (!product) return null
+
+  const variants = await db.collection<VariantDoc>('variants').find({ product_slug: slug }).toArray()
+  const productId = product._id
+
+  const [optionAxes, legacyOptions, inventoryBySku, category] = await Promise.all([
+    productId
+      ? db.collection<MongoOptionAxisDoc>('product_option_axes').find({ product_id: productId }).toArray()
+      : Promise.resolve([] as MongoOptionAxisDoc[]),
+    db.collection<MongoLegacyOptionDoc>('product_options').find({ product_slug: slug }).toArray(),
+    loadInventoryForSkus(
+      db,
+      variants.map((v) => v.sku)
+    ),
+    product.category_slug
+      ? db.collection<CategoryDoc>('categories').findOne({ slug: product.category_slug })
+      : Promise.resolve(null),
+  ])
+
+  const axisObjectIds = optionAxes.flatMap((a) => (a._id ? [a._id] : []))
+  const optionValues =
+    axisObjectIds.length > 0
+      ? await db
+          .collection<MongoOptionValueDoc>('product_option_values')
+          .find({ option_id: { $in: axisObjectIds } })
+          .toArray()
+      : []
+
+  return {
+    product,
+    variants,
+    optionAxes,
+    optionValues,
+    legacyOptions,
+    inventoryBySku,
+    category,
+  }
 }

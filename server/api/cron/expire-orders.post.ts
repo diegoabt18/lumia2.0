@@ -13,6 +13,6 @@ export default defineEventHandler(async (event) => {
     return { ok: true, released: 0 }
   }
 
-  const released = await expireStalePendingOrders(100)
+  const released = await expireStalePendingOrders(100, event)
   return { ok: true, released }
 })

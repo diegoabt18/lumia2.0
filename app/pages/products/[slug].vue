@@ -223,6 +223,9 @@
   <div v-else class="flex min-h-[50vh] items-center justify-center bg-lumia-canvas px-4">
     <div class="text-center">
       <p class="font-display text-lg text-lumia-ink/70">No encontramos este producto.</p>
+      <p v-if="productError" class="mt-2 text-sm text-lumia-ink/45">
+        {{ productErrorMessage }}
+      </p>
       <NuxtLink to="/products" class="mt-4 inline-block text-sm font-medium text-lumia-gold underline-offset-4 hover:underline">
         Volver al catálogo
       </NuxtLink>
@@ -238,13 +241,14 @@ import { useMediaQuery, useWindowScroll } from '@vueuse/core'
 const route = useRoute()
 const slugParam = computed(() => String(route.params.slug ?? ''))
 
-const { data: detailData, pending: productPending } = useAsyncData(
+const { data: detailData, pending: productPending, error: productError } = useAsyncData(
   () => `product-detail-${slugParam.value}`,
-  () =>
-    $fetch<{ product: Product | null }>(`/api/products/${encodeURIComponent(slugParam.value)}`, {
-      timeout: 8_000,
-    }).catch(() => ({ product: null })),
-  { watch: [slugParam], default: () => ({ product: null }) }
+  async () => {
+    const { fetchProductBySlug } = useCatalog()
+    const { product } = await fetchProductBySlug(slugParam.value)
+    return { product }
+  },
+  { watch: [slugParam], default: () => ({ product: null as Product | null }) }
 )
 
 const { fetchProducts } = useCatalog()
@@ -256,6 +260,15 @@ const { data: relatedData } = useAsyncData(
 )
 
 const product = computed(() => detailData.value?.product ?? null)
+
+const productErrorMessage = computed(() => {
+  const e = productError.value as { data?: { message?: string }; message?: string; statusCode?: number } | null
+  if (!e) return ''
+  if (e.statusCode === 503) {
+    return 'El catálogo edge no respondió. Si acabas de desplegar, ejecuta npm run db:d1:migrate:002:remote.'
+  }
+  return e.data?.message ?? e.message ?? 'Error al cargar el producto.'
+})
 
 const { addItem, isAdding } = useCart()
 const { formatPrice } = useUtils()
@@ -300,7 +313,8 @@ const variantStockStatus = computed<'in_stock' | 'made_to_order' | 'out_of_stock
   const v = selectedVariant.value
   if (!v) return 'out_of_stock'
   if (v.isMadeToOrder) return 'made_to_order'
-  const stock = v.stock ?? v.available ?? 0
+  const stock = v.stock ?? v.available
+  if (stock == null) return 'in_stock'
   if (stock > 0) return 'in_stock'
   return 'out_of_stock'
 })
