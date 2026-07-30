@@ -7,6 +7,8 @@ const mongoOptionalDepStub = fileURLToPath(
 const googleFontsUrl =
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap'
 
+const isProd = process.env.NODE_ENV === 'production'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2026-07-28',
@@ -90,14 +92,19 @@ export default defineNuxtConfig({
       configPath: 'wrangler.jsonc',
     },
     routeRules: {
-      '/': { swr: 120 },
       '/design-system': { redirect: { to: '/admin/design-system', statusCode: 301 } },
-      '/api/categories': { swr: 900 },
-      '/api/products': { swr: 120 },
-      '/api/products/**': { swr: 120 },
-      '/api/cdn/images': { swr: 300 },
-      '/products': { swr: 180 },
-      '/products/**': { swr: 180 },
+      // SWR solo en prod: en dev la caché en disco se corrompe con HMR → "Malformed data read from cache"
+      ...(isProd
+        ? {
+            '/': { swr: 120 },
+            '/api/categories': { swr: 900 },
+            '/api/products': { swr: 120 },
+            '/api/products/**': { swr: 120 },
+            '/api/cdn/images': { swr: 300 },
+            '/products': { swr: 180 },
+            '/products/**': { swr: 180 },
+          }
+        : {}),
     },
     alias: {
       '@aws-sdk/credential-providers': mongoOptionalDepStub,

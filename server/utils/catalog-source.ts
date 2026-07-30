@@ -27,21 +27,20 @@ export function resolveCatalogSource(options: {
 }): ResolvedCatalogSource {
   const { mode, d1Available, mongoAvailable } = options
 
+  if (mode === 'd1') {
+    return 'd1'
+  }
+
   if (mode === 'mongo') {
     if (mongoAvailable) return 'mongo'
     if (d1Available) return 'd1'
     return 'mongo'
   }
 
-  if (mode === 'd1') {
-    if (d1Available) return 'd1'
-    if (mongoAvailable) return 'mongo'
-    return 'd1'
-  }
-
+  // auto
   if (d1Available) return 'd1'
   if (mongoAvailable) return 'mongo'
-  return 'mongo'
+  return 'd1'
 }
 
 export function resolveCatalogSourceForEvent(event?: H3Event): ResolvedCatalogSource {
@@ -75,7 +74,7 @@ export async function resolveCatalogSourceForEventAsync(event?: H3Event): Promis
   const mongoAvailable = isCatalogDbConfigured()
 
   if (mode === 'd1') {
-    return resolveCatalogSource({ mode, d1Available, mongoAvailable })
+    return 'd1'
   }
 
   if (mode === 'mongo') {
@@ -84,12 +83,12 @@ export async function resolveCatalogSourceForEventAsync(event?: H3Event): Promis
 
   // auto
   if (!d1Available) {
-    return mongoAvailable ? 'mongo' : 'mongo'
+    return mongoAvailable ? 'mongo' : 'd1'
   }
 
   const cached = autoSourceCache
-  if (cached?.source === 'd1' && Date.now() - cached.at < AUTO_SOURCE_TTL_MS) {
-    return 'd1'
+  if (cached && Date.now() - cached.at < AUTO_SOURCE_TTL_MS) {
+    return cached.source
   }
 
   const d1Ping = await pingCatalogD1(event)
@@ -101,5 +100,6 @@ export async function resolveCatalogSourceForEventAsync(event?: H3Event): Promis
     }
   }
 
+  autoSourceCache = { at: Date.now(), source: mongoAvailable ? 'mongo' : 'd1' }
   return mongoAvailable ? 'mongo' : 'd1'
 }

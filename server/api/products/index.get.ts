@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
         },
         event
       ),
-      15_000,
+      8_000,
       'catalog list'
     )
     const totalPages = Math.max(1, Math.ceil(total / limit))
@@ -57,13 +57,26 @@ export default defineEventHandler(async (event) => {
     }
   } catch (e: unknown) {
     const err = e as { statusCode?: number; message?: string }
+    const message = err?.message ?? ''
+
+    if (message.includes('CATALOG_DB binding')) {
+      console.error('[api/products] D1 binding missing')
+      throw createError({
+        statusCode: 503,
+        message: 'Catálogo edge (D1) no disponible. Revisa el binding CATALOG_DB en Workers.',
+      })
+    }
+
     if (err.statusCode === 503) {
       throw createError({ statusCode: 503, message: err.message ?? 'Catálogo no disponible' })
     }
+
     console.error('[api/products]', e)
     throw createError({
       statusCode: 503,
-      message: 'El catálogo tardó demasiado. Inténtalo de nuevo.',
+      message: message.includes('timeout')
+        ? 'El catálogo tardó demasiado. Inténtalo de nuevo.'
+        : 'Catálogo no disponible temporalmente.',
     })
   }
 })

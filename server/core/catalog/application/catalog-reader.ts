@@ -11,11 +11,17 @@ import {
 import type { CategoryRow } from '../infrastructure/category.repository'
 
 async function resolveSource(event?: H3Event): Promise<ResolvedCatalogSource> {
+  const mode = getConfiguredCatalogSourceMode()
+
+  if (mode === 'd1') {
+    return 'd1'
+  }
+
   if (!event) {
-    const mode = getConfiguredCatalogSourceMode()
-    if (mode === 'd1' || (mode === 'auto' && !isCatalogDbConfigured())) return 'd1'
+    if (mode === 'auto' && !isCatalogDbConfigured()) return 'd1'
     return isCatalogDbConfigured() ? 'mongo' : 'd1'
   }
+
   return resolveCatalogSourceForEventAsync(event)
 }
 
@@ -49,9 +55,16 @@ export async function listProductsPage(
 
   if (source === 'd1') {
     if (!event) {
-      warnMongoCatalogRead('listProductsPage (sin event)')
-      const { listProductsPage: listMongo } = await import('../infrastructure/product.repository')
-      return listMongo(options)
+      throw createError({
+        statusCode: 503,
+        message: 'Catálogo D1 requiere contexto de petición (event).',
+      })
+    }
+    if (!isCatalogD1Bound(event)) {
+      throw createError({
+        statusCode: 503,
+        message: 'Catálogo edge (D1) no disponible en este Worker.',
+      })
     }
     const { listProductsPageD1 } = await import('../infrastructure/product-d1.repository')
     return listProductsPageD1(event, options)
@@ -66,10 +79,8 @@ export async function getProductBySlug(slug: string, event?: H3Event): Promise<P
   const source = await resolveSource(event)
 
   if (source === 'd1') {
-    if (!event) {
-      warnMongoCatalogRead('getProductBySlug (sin event)')
-      const { getProductBySlug: getMongo } = await import('../infrastructure/product.repository')
-      return getMongo(slug)
+    if (!event || !isCatalogD1Bound(event)) {
+      throw createError({ statusCode: 503, message: 'Catálogo edge (D1) no disponible.' })
     }
     const { getProductBySlugD1 } = await import('../infrastructure/product-d1.repository')
     return getProductBySlugD1(event, slug)
@@ -84,15 +95,12 @@ export async function listCategories(event?: H3Event): Promise<CategoryRow[]> {
   const source = await resolveSource(event)
 
   if (source === 'd1') {
-    if (!event) {
-      warnMongoCatalogRead('listCategories (sin event)')
-      const { listCategories: listMongo } = await import('../infrastructure/category.repository')
-      return listMongo()
+    if (!event || !isCatalogD1Bound(event)) {
+      throw createError({ statusCode: 503, message: 'Catálogo edge (D1) no disponible.' })
     }
     const { listCategoriesD1 } = await import('../infrastructure/category-d1.repository')
     return listCategoriesD1(event)
   }
-
   warnMongoCatalogRead('listCategories')
   const { listCategories: listMongo } = await import('../infrastructure/category.repository')
   return listMongo()
