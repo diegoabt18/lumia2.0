@@ -29,6 +29,18 @@ export async function getCached<T>(key: string, ttlMs: number, loader: () => Pro
   return loadAndStore(key, loader)
 }
 
+/** Invalida entradas cuya clave empieza con el prefijo (p. ej. `catalog:`). */
+export function invalidateCacheByPrefix(prefix: string): number {
+  let removed = 0
+  for (const key of stores.keys()) {
+    if (key.startsWith(prefix)) {
+      stores.delete(key)
+      removed++
+    }
+  }
+  return removed
+}
+
 export function setPublicCacheHeaders(event: H3Event, seconds: number) {
   const value = `public, max-age=${seconds}, s-maxage=${seconds * 2}, stale-while-revalidate=${seconds * 4}`
   setHeader(event, 'Cache-Control', value)

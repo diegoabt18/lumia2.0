@@ -19,7 +19,19 @@
 
       <div v-if="loadingStatus && !status" class="mt-6 text-sm text-lumia-ink/50">Cargando estado…</div>
 
-      <div v-else-if="status" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div v-else-if="status" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="rounded-xl border border-lumia-ink/8 bg-lumia-cream/30 p-4">
+          <p class="text-xs font-medium uppercase tracking-wider text-lumia-ink/45">Fuente activa</p>
+          <p
+            class="mt-1 font-display text-lg"
+            :class="status.activeCatalogSource === 'd1' ? 'text-emerald-700' : 'text-amber-700'"
+          >
+            {{ status.activeCatalogSource === 'd1' ? 'D1' : 'Mongo' }}
+          </p>
+          <p class="mt-1 text-xs text-lumia-ink/55">
+            Modo {{ status.catalogSourceMode }}{{ status.cutoverReady ? ' · cutover OK' : '' }}
+          </p>
+        </div>
         <div class="rounded-xl border border-lumia-ink/8 bg-lumia-cream/30 p-4">
           <p class="text-xs font-medium uppercase tracking-wider text-lumia-ink/45">MongoDB</p>
           <p class="mt-1 font-display text-lg" :class="status.mongoConfigured ? 'text-emerald-700' : 'text-amber-700'">

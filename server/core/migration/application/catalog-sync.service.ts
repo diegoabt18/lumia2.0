@@ -38,6 +38,11 @@ import {
   listMigrationLogs,
 } from '../infrastructure/migration-log.repository'
 import { previewIntegrityFromMongo, validateCatalogIntegrity } from './integrity-validator'
+import { invalidateCatalogCaches } from '../../../utils/catalog-cache'
+import {
+  getConfiguredCatalogSourceMode,
+  resolveCatalogSourceForEventAsync,
+} from '../../../utils/catalog-source'
 
 export interface SyncOptions {
   dryRun?: boolean
@@ -190,6 +195,7 @@ export async function runCatalogSync(
       rowsWritten,
       error: null,
     })
+    invalidateCatalogCaches()
   }
 
   const integrity =
@@ -213,12 +219,15 @@ export async function getMigrationStatus(event: H3Event): Promise<MigrationStatu
   const mongoConfigured = isCatalogDbConfigured()
   const d1Ping = await pingCatalogD1(event)
   const db = getCatalogD1(event)
+  const catalogSourceMode = getConfiguredCatalogSourceMode()
+  const activeCatalogSource = await resolveCatalogSourceForEventAsync(event)
 
   let counts: MigrationStatusResponse['counts'] = { mongo: null, d1: null }
   let latestLog = null
   let lastSyncAt: string | null = null
   let lastSyncTarget: string | null = null
   let lastSyncBy: string | null = null
+  let d1HasProducts = false
 
   if (mongoConfigured) {
     try {
@@ -232,6 +241,7 @@ export async function getMigrationStatus(event: H3Event): Promise<MigrationStatu
     try {
       const session = createMigrationWriteSession(event)
       counts.d1 = await countD1CatalogEntities(session)
+      d1HasProducts = (counts.d1?.products ?? 0) > 0
       lastSyncAt = await getMigrationMetaValue(session, 'last_sync_at')
       lastSyncTarget = await getMigrationMetaValue(session, 'last_sync_target')
       lastSyncBy = await getMigrationMetaValue(session, 'last_sync_by')
@@ -241,11 +251,22 @@ export async function getMigrationStatus(event: H3Event): Promise<MigrationStatu
     }
   }
 
+  const cutoverReady =
+    mongoConfigured &&
+    d1Ping.bound &&
+    d1Ping.connected &&
+    d1HasProducts &&
+    catalogSourceMode === 'auto'
+
   return {
     mongoConfigured,
     d1Bound: d1Ping.bound,
     d1Connected: d1Ping.connected,
     schemaVersion: d1Ping.schemaVersion,
+    catalogSourceMode,
+    activeCatalogSource,
+    d1HasProducts,
+    cutoverReady,
     lastSyncAt,
     lastSyncTarget,
     lastSyncBy,

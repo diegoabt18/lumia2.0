@@ -79,6 +79,26 @@ Variable `NUXT_CATALOG_SOURCE`: `mongo` (default) | `d1` | `auto`. Ver `server/d
 
 Ruta `/admin/migration` (rol `admin` en sesión). Sync Mongo → D1 desde la UI.
 
+### Cutover producción (Fase 4)
+
+Checklist tras `cf:deploy:prod`:
+
+1. `npm run db:d1:migrate:remote` — schema D1 remoto
+2. `wrangler.jsonc` → `env.production.d1_databases` con binding `CATALOG_DB`
+3. Dashboard → D1 → `lumia-catalog` → **Enable Read Replication**
+4. `/admin/migration` → **Sync completa** (o dry-run primero)
+5. Verificar **Fuente activa: D1** en el panel (`NUXT_CATALOG_SOURCE=auto`)
+6. `GET /api/health` → `catalogD1.active` debe ser `"d1"`
+
+**Sync automática** (opcional): programa un cron externo o Cloudflare Cron Trigger:
+
+```bash
+curl -X POST https://lumiadalistore.com/api/cron/sync-catalog \
+  -H "Authorization: Bearer $NUXT_CRON_SECRET"
+```
+
+Requiere `NUXT_CRON_SECRET` en secretos de producción (`npm run cf:secrets:prod`).
+
 ### Lectura catálogo (Fase 2)
 
 Endpoints públicos usan `server/core/catalog/application/catalog-reader.ts`:

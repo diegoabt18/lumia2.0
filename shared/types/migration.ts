@@ -59,6 +59,13 @@ export interface MigrationStatusResponse {
   d1Bound: boolean
   d1Connected: boolean
   schemaVersion: string | null
+  /** Configuración: mongo | d1 | auto */
+  catalogSourceMode: 'mongo' | 'd1' | 'auto'
+  /** Fuente que sirve lecturas públicas ahora mismo */
+  activeCatalogSource: 'mongo' | 'd1'
+  d1HasProducts: boolean
+  /** true cuando auto + D1 listo con productos sync */
+  cutoverReady: boolean
   lastSyncAt: string | null
   lastSyncTarget: string | null
   lastSyncBy: string | null

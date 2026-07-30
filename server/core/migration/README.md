@@ -41,3 +41,25 @@ Promover admin: `identity_db.users.role = 'admin'` en MongoDB.
 
 Ruta: `/admin/migration` (middleware `admin`, layout `admin`).
 
+## Fase 4 — cutover y cron
+
+| Paso | Acción |
+|------|--------|
+| 1 | Schema remoto: `npm run db:d1:migrate:remote` |
+| 2 | Binding D1 en `env.production` + deploy |
+| 3 | Sync manual desde panel o cron |
+| 4 | Confirmar **Fuente activa: D1** con `NUXT_CATALOG_SOURCE=auto` |
+
+### Cron sync
+
+`POST /api/cron/sync-catalog` — sync completa protegida por `NUXT_CRON_SECRET`.
+
+- Omite si ya hay un log `running`
+- Invalida caché in-memory del catálogo tras sync exitosa
+- `triggeredBy: cron` en `migration_logs`
+
+```bash
+curl -X POST https://tu-dominio/api/cron/sync-catalog \
+  -H "Authorization: Bearer $NUXT_CRON_SECRET"
+```
+

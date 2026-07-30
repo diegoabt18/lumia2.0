@@ -127,3 +127,15 @@ export async function getLatestMigrationLog(
   const rows = await listMigrationLogs(session, 1)
   return rows[0] ?? null
 }
+
+export async function hasRunningMigrationLog(session: CatalogD1DatabaseSession): Promise<boolean> {
+  try {
+    const row = await session
+      .prepare(`SELECT 1 AS ok FROM migration_logs WHERE status = 'running' LIMIT 1`)
+      .first<{ ok: number }>()
+    return row?.ok === 1
+  } catch (error) {
+    if (isD1MissingTableError(error)) return false
+    throw error
+  }
+}
