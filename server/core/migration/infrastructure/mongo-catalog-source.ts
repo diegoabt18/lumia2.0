@@ -1,6 +1,8 @@
 import type { PromotionEntity } from '../../catalog/domain/promotion'
 import type { CategoryDoc } from '../../catalog/infrastructure/category.repository'
 import type { ProductDoc, VariantDoc } from '../../catalog/infrastructure/product.repository'
+import type { InventorySummary } from '../../catalog/application/resolve-variant-stock'
+import { loadInventoryBySku } from '../../catalog/infrastructure/inventory-summary.repository'
 
 export interface MongoOptionAxisDoc {
   _id?: { toString(): string }
@@ -33,6 +35,7 @@ export interface MongoCatalogSnapshot {
   optionValues: MongoOptionValueDoc[]
   legacyOptions: MongoLegacyOptionDoc[]
   productCountsByCategory: Map<string, number>
+  inventoryBySku: Map<string, InventorySummary>
 }
 
 async function getDb() {
@@ -43,7 +46,7 @@ async function getDb() {
 export async function loadMongoCatalogSnapshot(): Promise<MongoCatalogSnapshot> {
   const db = await getDb()
 
-  const [categories, products, variants, promotions, optionAxes, optionValues, legacyOptions, countRows] =
+  const [categories, products, variants, promotions, optionAxes, optionValues, legacyOptions, countRows, inventoryBySku] =
     await Promise.all([
       db.collection<CategoryDoc>('categories').find().sort({ name: 1 }).toArray(),
       db.collection<ProductDoc>('products').find().toArray(),
@@ -59,6 +62,7 @@ export async function loadMongoCatalogSnapshot(): Promise<MongoCatalogSnapshot> 
           { $group: { _id: '$category_slug', n: { $sum: 1 } } },
         ])
         .toArray(),
+      loadInventoryBySku(db),
     ])
 
   const productCountsByCategory = new Map<string, number>()
@@ -76,6 +80,7 @@ export async function loadMongoCatalogSnapshot(): Promise<MongoCatalogSnapshot> 
     optionValues,
     legacyOptions,
     productCountsByCategory,
+    inventoryBySku,
   }
 }
 

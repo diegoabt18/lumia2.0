@@ -50,6 +50,8 @@ Ruta: `/admin/migration` (middleware `admin`, layout `admin`).
 | 3 | Sync manual desde panel o cron |
 | 4 | Confirmar **Fuente activa: D1** con `NUXT_CATALOG_SOURCE=auto` |
 
+**Stock:** la sync de `variants` incluye cantidades desde Mongo `inventory_items` (no es una tabla D1 aparte). Tras cambios de inventario en lumia, vuelve a sincronizar `variants` o `full`.
+
 ### Cron sync
 
 `POST /api/cron/sync-catalog` — sync completa protegida por `NUXT_CRON_SECRET`.

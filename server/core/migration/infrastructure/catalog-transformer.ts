@@ -1,6 +1,11 @@
 import type { PromotionEntity } from '../../catalog/domain/promotion'
 import type { CategoryDoc } from '../../catalog/infrastructure/category.repository'
 import type { ProductDoc, VariantDoc } from '../../catalog/infrastructure/product.repository'
+import {
+  isVariantMadeToOrder,
+  resolveVariantStockQuantities,
+  type InventorySummary,
+} from '../../catalog/application/resolve-variant-stock'
 import type {
   MongoLegacyOptionDoc,
   MongoOptionAxisDoc,
@@ -129,9 +134,14 @@ export function transformProducts(docs: ProductDoc[]): D1ProductRow[] {
   }))
 }
 
-export function transformVariants(docs: VariantDoc[]): D1VariantRow[] {
+export function transformVariants(
+  docs: VariantDoc[],
+  inventoryBySku: Map<string, InventorySummary> = new Map()
+): D1VariantRow[] {
   const syncedAt = nowIso()
   return docs.map((doc) => {
+    const inv = inventoryBySku.get(doc.sku)
+    const { stock, available } = resolveVariantStockQuantities(doc, inv)
     const optionRules = doc.option_rules?.length
       ? doc.option_rules.map((rule) => ({
           optionId: rule.option_id.toString(),
@@ -148,9 +158,9 @@ export function transformVariants(docs: VariantDoc[]): D1VariantRow[] {
       currency: doc.currency ?? 'COP',
       optionsJson: json(doc.options),
       imagePath: doc.image_path ?? null,
-      stock: typeof doc.stock === 'number' ? doc.stock : null,
-      available: typeof doc.available === 'number' ? doc.available : null,
-      isPerOrder: doc.is_per_order === true ? 1 : 0,
+      stock,
+      available,
+      isPerOrder: isVariantMadeToOrder(doc, inv) ? 1 : 0,
       optionRulesJson: json(optionRules),
       optionValueIdsJson: json(optionValueIds),
       syncedAt,

@@ -102,7 +102,7 @@ async function syncSingleTarget(
     }
     case 'variants': {
       rowsRead = snapshot.variants.length
-      const rows = transformVariants(snapshot.variants)
+      const rows = transformVariants(snapshot.variants, snapshot.inventoryBySku)
       rowsWritten = await upsertVariants(session, rows)
       break
     }

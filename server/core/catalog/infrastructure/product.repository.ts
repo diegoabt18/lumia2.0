@@ -1,4 +1,10 @@
 import type { Product, ProductVariant } from '#shared/types/product'
+import {
+  isVariantMadeToOrder,
+  resolveVariantStockQuantities,
+  type InventorySummary,
+} from '../application/resolve-variant-stock'
+import { loadInventoryBySku } from './inventory-summary.repository'
 
 /** Documento MongoDB — colección `products` */
 export interface ProductDoc {
@@ -54,9 +60,10 @@ function searchFilter(
   }
 }
 
-function mapVariant(v: VariantDoc): ProductVariant {
-  const available = typeof v.available === 'number' ? v.available : undefined
-  const quantity = typeof v.stock === 'number' ? v.stock : available
+function mapVariant(v: VariantDoc, inventoryBySku?: Map<string, InventorySummary>): ProductVariant {
+  const inv = inventoryBySku?.get(v.sku)
+  const { stock, available } = resolveVariantStockQuantities(v, inv)
+  const quantity = stock ?? available ?? 0
   const optionRules = v.option_rules?.length
     ? v.option_rules.map((r) => ({
         optionId: r.option_id.toString(),
@@ -75,9 +82,9 @@ function mapVariant(v: VariantDoc): ProductVariant {
     currency: v.currency ?? 'COP',
     quantity,
     stock: quantity,
-    available,
+    available: available ?? undefined,
     imagePath: v.image_path ?? null,
-    isMadeToOrder: v.is_per_order === true,
+    isMadeToOrder: isVariantMadeToOrder(v, inv),
   }
 }
 
@@ -127,8 +134,12 @@ export async function getVariantBySku(sku: string): Promise<(VariantDoc & { prod
   return { ...variant, product_name: product?.name }
 }
 
-function mapProduct(doc: ProductDoc, variants: VariantDoc[] = []): Product {
-  const mappedVariants = variants.map(mapVariant)
+function mapProduct(
+  doc: ProductDoc,
+  variants: VariantDoc[] = [],
+  inventoryBySku?: Map<string, InventorySummary>
+): Product {
+  const mappedVariants = variants.map((v) => mapVariant(v, inventoryBySku))
   const fromPrice =
     mappedVariants.length > 0
       ? Math.min(...mappedVariants.map((x) => x.salePrice ?? x.price))
@@ -187,7 +198,7 @@ export async function listProductsPage(options: {
   const skip = options.skip ?? 0
   const match = searchFilter(options.search, options.categorySlugs, options.productSlugs)
 
-  const [productRows, total, topSlugs, promotions] = await Promise.all([
+  const [productRows, total, topSlugs, promotions, inventoryBySku] = await Promise.all([
     db
       .collection<ProductDoc>('products')
       .find(match)
@@ -209,6 +220,7 @@ export async function listProductsPage(options: {
     db.collection<ProductDoc>('products').countDocuments(match),
     findTopSellingSlugsCached(8),
     findActivePromotionsCached(),
+    loadInventoryBySku(db),
   ])
 
   const slugs = productRows.map((row) => row.slug)
@@ -237,7 +249,7 @@ export async function listProductsPage(options: {
   const now = new Date()
 
   const products = productRows.map((row) => {
-    let product = mapProduct(row, variantsBySlug.get(row.slug) ?? [])
+    let product = mapProduct(row, variantsBySlug.get(row.slug) ?? [], inventoryBySku)
     product = applyPromotionsToProduct(product, promotions, now)
     if (topSet.has(product.slug)) product.salesBadge = 'bestseller'
     else if (row.sales_total_units != null && row.sales_total_units >= 3) {
@@ -262,7 +274,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   const { applyPromotionsToProduct } = await import('../../pricing/apply-product-promotions')
   const db = await getCatalogDb()
 
-  const [productDoc, variantDocs, topSlugs, promotions] = await Promise.all([
+  const [productDoc, variantDocs, topSlugs, promotions, inventoryBySku] = await Promise.all([
     db.collection<ProductDoc>('products').findOne({ slug, status: { $ne: 'inactive' } }),
     db
       .collection<VariantDoc>('variants')
@@ -271,11 +283,12 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       .toArray(),
     findTopSellingSlugsCached(8),
     findActivePromotionsCached(),
+    loadInventoryBySku(db),
   ])
 
   if (!productDoc) return null
 
-  let product = mapProduct(productDoc, variantDocs)
+  let product = mapProduct(productDoc, variantDocs, inventoryBySku)
   const productId = productDoc._id?.toString?.() ?? product.id
   await enrichProductDetail(product, variantDocs, productId)
   product = applyPromotionsToProduct(product, promotions, new Date())
