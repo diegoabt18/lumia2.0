@@ -50,20 +50,6 @@
 
       <button
         type="button"
-        class="absolute right-1.5 top-1.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/35 bg-white/65 text-lumia-ink/75 shadow-sm backdrop-blur-md transition hover:text-lumia-gold active:scale-95 disabled:opacity-40 md:right-2 md:top-2 md:h-10 md:w-10"
-        :aria-pressed="favorited"
-        aria-label="Favoritos"
-        :disabled="favPending"
-        @click.stop="toggleFavorite"
-      >
-        <IconHeart
-          class="h-4 w-4 stroke-[1.5] md:h-[18px] md:w-[18px]"
-          :class="favorited ? 'fill-lumia-gold text-lumia-gold' : 'text-lumia-ink/55'"
-        />
-      </button>
-
-      <button
-        type="button"
         class="absolute bottom-2 right-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/45 bg-lumia-ink text-lumia-cream shadow-[0_10px_28px_-8px_rgba(15,15,15,0.45)] transition active:scale-[0.92] disabled:opacity-35 md:hidden"
         :disabled="!firstSku || isOutOfStock || quickAddPending"
         :aria-label="'Añadir ' + product.name + ' al carrito'"
@@ -131,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconHeart, IconLoader2, IconPlus } from '@tabler/icons-vue'
+import { IconLoader2, IconPlus } from '@tabler/icons-vue'
 import type { Product, ProductVariant } from '#shared/types/product'
 import { formatVariantLabel } from '#shared/variant-label'
 
@@ -154,19 +140,6 @@ const { formatPrice } = useUtils()
 const { addItem, isAdding } = useCart()
 const toast = useToast()
 const justAdded = ref(false)
-
-const slugRef = computed(() => props.product.slug)
-const { favorited, pending: favPending, toggle: toggleWishlist } = useProductWishlist(slugRef)
-
-async function toggleFavorite() {
-  const result = await toggleWishlist()
-  if (result === null) return
-  if (result) {
-    toast.success(useAuth().user.value ? 'Añadido a favoritos' : 'Guardado en favoritos (este dispositivo)')
-  } else {
-    toast.info('Quitado de favoritos')
-  }
-}
 
 const imgSrc = computed(() =>
   resolveProductImageSrc(props.product.slug, props.product.imagePath ?? '', PRODUCT_IMAGE_SIZE_LARGE)

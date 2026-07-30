@@ -7,7 +7,7 @@
 
       <h1 class="mt-6 font-display text-3xl text-lumia-ink">Iniciar sesión</h1>
       <p class="mt-3 text-sm leading-relaxed text-lumia-ink/60">
-        Accede con tu cuenta de Google para guardar tu carrito, favoritos y el historial de pedidos.
+        Accede con tu cuenta de Google para guardar tu carrito y el historial de pedidos.
       </p>
 
       <SecurityTurnstileWidget

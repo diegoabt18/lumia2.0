@@ -34,10 +34,4 @@ watch(cartBootstrap, (payload) => {
     cartStore.$patch({ apiEnabled: false })
   }
 }, { immediate: true })
-
-onMounted(() => {
-  if (useAuth().user.value) {
-    void useWishlist().load()
-  }
-})
 </script>

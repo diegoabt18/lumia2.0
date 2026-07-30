@@ -27,27 +27,13 @@
           </div>
 
           <div class="flex flex-col duration-500">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">LUMIA</p>
-                <h1 class="mt-3 font-display text-4xl font-medium leading-tight text-lumia-ink md:text-5xl">
-                  {{ product.name }}
-                </h1>
-              </div>
-              <button
-                type="button"
-                class="shrink-0 rounded-full border border-lumia-ink/10 bg-white p-3 shadow-soft transition hover:border-lumia-gold/35 hover:shadow-soft-lg"
-                :aria-pressed="favorited"
-                :aria-busy="wishPending"
-                aria-label="Favoritos"
-                @click="onToggleWishlist"
-              >
-                <IconHeart
-                  class="h-6 w-6 stroke-[1.25] transition-colors"
-                  :class="favorited ? 'fill-lumia-gold text-lumia-gold' : 'text-lumia-ink/55'"
-                />
-              </button>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">LUMIA</p>
+              <h1 class="mt-3 font-display text-4xl font-medium leading-tight text-lumia-ink md:text-5xl">
+                {{ product.name }}
+              </h1>
             </div>
+          </div>
 
             <div class="mt-5">
               <PdpBadgesRow :sales-badge="product.salesBadge ?? null" />
@@ -248,7 +234,6 @@
 <script setup lang="ts">
 import type { Product, ProductOptionAxisDTO, ProductVariant } from '#shared/types/product'
 import { formatVariantLabel } from '#shared/variant-label'
-import { IconHeart } from '@tabler/icons-vue'
 import { useMediaQuery, useWindowScroll } from '@vueuse/core'
 
 const route = useRoute()
@@ -277,9 +262,6 @@ const { addItem, isAdding } = useCart()
 const { formatPrice } = useUtils()
 const { resolveProductImageSrc } = useProductImages()
 const toast = useToast()
-
-const slugRef = computed(() => product.value?.slug ?? '')
-const { favorited, pending: wishPending, toggle: toggleWishlist } = useProductWishlist(slugRef)
 
 const buyNowPending = ref(false)
 
@@ -464,16 +446,6 @@ function variantSelectLabel(v: ProductVariant) {
 function openLightbox(i: number) {
   lightboxStartIndex.value = i
   lightboxOpen.value = true
-}
-
-async function onToggleWishlist() {
-  const result = await toggleWishlist()
-  if (result === null) return
-  if (result) {
-    toast.success(useAuth().user.value ? 'Añadido a favoritos' : 'Guardado en favoritos (este dispositivo)')
-  } else {
-    toast.info('Quitado de favoritos')
-  }
 }
 
 async function addToCart() {

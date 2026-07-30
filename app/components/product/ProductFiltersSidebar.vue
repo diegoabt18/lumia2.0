@@ -41,24 +41,6 @@
     </section>
 
     <section class="mt-6 border-t border-lumia-ink/8 pt-6">
-      <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">Favoritos</h3>
-      <label class="mt-4 flex cursor-pointer items-center gap-3">
-        <input
-          v-model="favoritesOnlyModel"
-          type="checkbox"
-          class="h-4 w-4 rounded border-lumia-ink/20 text-lumia-gold focus:ring-lumia-gold/40"
-        >
-        <span class="flex flex-1 items-center justify-between gap-2 text-lumia-ink">
-          <span>Solo mis favoritos</span>
-          <span v-if="favoritesCount > 0" class="text-xs text-lumia-ink/40">{{ favoritesCount }}</span>
-        </span>
-      </label>
-      <p v-if="favoritesOnlyModel && favoritesCount === 0" class="mt-2 text-xs leading-relaxed text-lumia-ink/45">
-        Aún no tienes favoritos. Toca el corazón en un producto para guardarlo.
-      </p>
-    </section>
-
-    <section class="mt-6 border-t border-lumia-ink/8 pt-6">
       <h3 class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">Ofertas</h3>
       <label class="mt-4 flex cursor-pointer items-center gap-3">
         <input
@@ -80,13 +62,11 @@ withDefaults(
     title?: string
     categories?: Category[]
     hasActiveFilters?: boolean
-    favoritesCount?: number
   }>(),
   {
     title: 'Filtros',
     categories: () => [],
     hasActiveFilters: false,
-    favoritesCount: 0,
   }
 )
 
@@ -94,7 +74,6 @@ defineEmits<{ clear: [] }>()
 
 const selectedCategory = defineModel<string>('selectedCategory', { default: '' })
 const promoOnlyModel = defineModel<boolean>('promoOnly', { default: false })
-const favoritesOnlyModel = defineModel<boolean>('favoritesOnly', { default: false })
 
 function toggleCategory(slug: string) {
   selectedCategory.value = selectedCategory.value === slug ? '' : slug
