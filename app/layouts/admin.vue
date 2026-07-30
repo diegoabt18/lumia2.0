@@ -40,14 +40,10 @@
 const route = useRoute()
 const { user, logout } = useAuth()
 
-const adminLinks = [
-  { to: '/admin/migration', label: 'Migración D1' },
-  { to: '/admin/design-system', label: 'Design system' },
-]
+const adminLinks = [{ to: '/admin/design-system', label: 'Design system' }]
 
 const pageTitle = computed(() => {
   if (route.path.startsWith('/admin/design-system')) return 'Sistema de diseño'
-  if (route.path.startsWith('/admin/migration')) return 'Panel de migración'
   return 'Administración'
 })
 

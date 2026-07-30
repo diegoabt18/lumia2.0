@@ -265,7 +265,7 @@ const productErrorMessage = computed(() => {
   const e = productError.value as { data?: { message?: string }; message?: string; statusCode?: number } | null
   if (!e) return ''
   if (e.statusCode === 503) {
-    return 'El catálogo edge no respondió. Si acabas de desplegar, ejecuta npm run db:d1:migrate:002:remote.'
+    return 'La API no respondió. Verifica que el servidor esté activo y NUXT_API_BASE_URL sea correcta.'
   }
   return e.data?.message ?? e.message ?? 'Error al cargar el producto.'
 })

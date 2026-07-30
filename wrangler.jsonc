@@ -3,8 +3,6 @@
   "name": "lumia2",
   "main": "./.output/server/index.mjs",
   "compatibility_date": "2026-07-28",
-  // `nodejs_compat` habilita node:net y node:tls, requeridos por el driver de MongoDB.
-  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./.output/public",
     "binding": "ASSETS"
@@ -12,18 +10,8 @@
   "observability": {
     "enabled": true
   },
-  // D1 catálogo (lectura edge). Tras `npm run db:d1:create`, pega aquí el database_id.
-  // Read replication: Dashboard → D1 → lumia-catalog → Settings → Enable Read Replication.
-  "d1_databases": [
-    {
-      "binding": "CATALOG_DB",
-      "database_name": "lumia-catalog",
-      "database_id": "c7feccb5-1076-4d9c-a129-da86fc5e1d74"
-    }
-  ],
-  // Variables no secretas. Secretos → `npm run cf:secrets:prod`.
   "vars": {
-    "NUXT_CATALOG_SOURCE": "auto",
+    "NUXT_API_BASE_URL": "https://api.lumiadalistore.com",
     "NUXT_SITE_URL": "http://localhost:8787",
     "NUXT_PUBLIC_STORE_CURRENCY": "COP",
     "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
@@ -34,22 +22,13 @@
     "NUXT_PUBLIC_CART_PAGE_NO_INDEX": "false",
     "NUXT_PUBLIC_AUTH_LOCAL_PROVIDER_ENABLED": "false",
     "NUXT_PUBLIC_PRODUCT_IMAGE_GALLERY_LAYOUT": "flat",
-    "NUXT_ORDER_NUMBER_PREFIX": "ORD",
-    "NUXT_ORDER_PAYMENT_TTL_HOURS": "24",
-    "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72"
+    "NUXT_ORDER_NUMBER_PREFIX": "ORD"
   },
   "env": {
     "production": {
       "name": "applumia2",
-      "d1_databases": [
-        {
-          "binding": "CATALOG_DB",
-          "database_name": "lumia-catalog",
-          "database_id": "c7feccb5-1076-4d9c-a129-da86fc5e1d74"
-        }
-      ],
       "vars": {
-        "NUXT_CATALOG_SOURCE": "d1",
+        "NUXT_API_BASE_URL": "https://api.lumiadalistore.com",
         "NUXT_SITE_URL": "https://lumiadalistore.com",
         "NUXT_PUBLIC_STORE_CURRENCY": "COP",
         "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
@@ -60,10 +39,7 @@
         "NUXT_PUBLIC_CART_PAGE_NO_INDEX": "false",
         "NUXT_PUBLIC_AUTH_LOCAL_PROVIDER_ENABLED": "false",
         "NUXT_PUBLIC_PRODUCT_IMAGE_GALLERY_LAYOUT": "flat",
-        "NUXT_ORDER_NUMBER_PREFIX": "ORD",
-        "NUXT_ORDER_PAYMENT_TTL_HOURS": "24",
-        "NUXT_ORDER_MANUAL_PAYMENT_TTL_HOURS": "72",
-        "NUXT_CHECKOUT_RESERVE_STOCK": "1"
+        "NUXT_ORDER_NUMBER_PREFIX": "ORD"
       },
       "routes": [
         { "pattern": "lumiadalistore.com", "custom_domain": true },

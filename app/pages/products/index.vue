@@ -295,14 +295,14 @@ const catalogFetchKey = computed(() => {
 
 type CatalogView = {
   products: Product[]
-  source: 'd1' | 'mongo'
+  source: 'api'
   pagination: { page: number; limit: number; total: number; totalPages: number }
 }
 
 function emptyCatalogView(): CatalogView {
   return {
     products: [],
-    source: 'd1',
+    source: 'api',
     pagination: { page: 1, limit: 12, total: 0, totalPages: 1 },
   }
 }
@@ -337,7 +337,7 @@ const clientCatalog = computed((): CatalogView | null => {
 
   return {
     products: list.slice(start, start + limit.value),
-    source: catalogSnapshot.value?.source ?? 'd1',
+    source: catalogSnapshot.value?.source ?? 'api',
     pagination: { page: safePage, limit: limit.value, total, totalPages },
   }
 })

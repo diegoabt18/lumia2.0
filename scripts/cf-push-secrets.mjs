@@ -16,13 +16,6 @@ import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
 
 const SECRET_KEYS = [
-  'NUXT_JWT_SECRET',
-  'NUXT_JWT_REFRESH_SECRET',
-  'NUXT_GOOGLE_CLIENT_ID',
-  'NUXT_GOOGLE_CLIENT_SECRET',
-  'NUXT_MONGO_AUTH_URI',
-  'NUXT_MONGO_CATALOG_URI',
-  'NUXT_MONGO_SALES_URI',
   'NUXT_RESEND_API_KEY',
   'NUXT_RESEND_FROM',
   'NUXT_ORDER_NOTIFY_EMAIL',

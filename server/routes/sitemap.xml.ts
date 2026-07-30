@@ -1,19 +1,26 @@
 import type { H3Event } from 'h3'
 import { LEGAL_SLUGS } from '#shared/legal/content'
-import { listProductsPage, isCatalogReadConfigured } from '../core/catalog/application/catalog-reader'
+import { lumiaApiFetch } from '../utils/lumia-api-client'
 
-async function loadAllProductPaths(event: H3Event): Promise<string[]> {  const paths: string[] = []
+async function loadAllProductPaths(event: H3Event): Promise<string[]> {
+  const paths: string[] = []
   const pageSize = 100
-  let skip = 0
-  let total = Number.POSITIVE_INFINITY
+  let page = 1
+  let totalPages = 1
 
-  while (skip < total) {
-    const { products, total: count } = await listProductsPage({ limit: pageSize, skip }, event)
-    total = count
+  while (page <= totalPages) {
+    const data = await lumiaApiFetch<{
+      products?: Array<{ slug: string }>
+      items?: Array<{ slug: string }>
+      pagination?: { totalPages: number }
+    }>(event, '/api/products', { query: { page, limit: pageSize } })
+
+    const products = data.products?.length ? data.products : data.items ?? []
     if (!products.length) break
+
     paths.push(...products.map((p) => `/products/${encodeURIComponent(p.slug)}`))
-    skip += products.length
-    if (products.length < pageSize) break
+    totalPages = data.pagination?.totalPages ?? page
+    page++
   }
 
   return paths
@@ -27,12 +34,10 @@ export default defineEventHandler(async (event) => {
   const legalPaths = LEGAL_SLUGS.map((s) => `/legal/${s}`)
 
   let productPaths: string[] = []
-  if (isCatalogReadConfigured(event)) {
-    try {
-      productPaths = await loadAllProductPaths(event)
-    } catch {
-      /* catálogo offline → sitemap estático */
-    }
+  try {
+    productPaths = await loadAllProductPaths(event)
+  } catch {
+    /* API offline → sitemap estático */
   }
 
   const urls = [...staticPaths, ...legalPaths, ...productPaths]
@@ -45,7 +50,7 @@ ${urls
     (path) => `  <url>
     <loc>${siteUrl}${path}</loc>
     <lastmod>${today}</lastmod>
-  </url>`
+  </url>`,
   )
   .join('\n')}
 </urlset>`

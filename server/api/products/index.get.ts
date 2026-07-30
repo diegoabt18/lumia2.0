@@ -1,82 +1,30 @@
-import type { CatalogSort } from '../../core/catalog/catalog-listing'
-import { listCatalogProductsCached } from '../../utils/catalog-listing-cache'
-import { setCatalogSourceHeader } from '../../utils/catalog-response'
+import { lumiaApiFetch } from '../../utils/lumia-api-client'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
-import { withServerTimeout } from '../../utils/server-timeout'
-
-function parseSort(raw: unknown): CatalogSort {
-  if (raw === 'name-asc' || raw === 'price-asc' || raw === 'price-desc') return raw
-  return 'featured'
-}
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const page = Math.max(1, Number(query.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20))
-  const skip = (page - 1) * limit
   const search = typeof query.search === 'string' ? query.search : undefined
   const categoryRaw = typeof query.category === 'string' ? query.category.trim() : undefined
-  const categorySlug = categoryRaw?.split(',')[0]?.trim() || undefined
-  const categorySlugs = categorySlug ? [categorySlug] : undefined
-  const slugsRaw = typeof query.slugs === 'string' ? query.slugs : undefined
-  const productSlugs = slugsRaw
-    ? slugsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 30)
-    : undefined
-  const promoOnly = query.promo === '1' || query.promo === 'true'
-  const sort = parseSort(query.sort)
+  const category = categoryRaw?.split(',')[0]?.trim() || undefined
 
-  try {
-    const { products, total } = await withServerTimeout(
-      listCatalogProductsCached(
-        {
-          limit,
-          skip,
-          search,
-          categorySlugs,
-          productSlugs,
-          promoOnly,
-          sort,
-        },
-        event
-      ),
-      8_000,
-      'catalog list'
-    )
-    const totalPages = Math.max(1, Math.ceil(total / limit))
+  const data = await lumiaApiFetch<{
+    products?: unknown[]
+    items?: unknown[]
+    pagination?: { page: number; limit: number; total: number; totalPages: number }
+  }>(event, '/api/products', {
+    query: { page, limit, search, category },
+  })
 
-    const cacheSeconds =
-      promoOnly || sort !== 'featured' ? 30 : search || categorySlugs?.length ? 45 : 90
-    setPublicCacheHeaders(event, cacheSeconds)
+  const products = data.products?.length ? data.products : data.items ?? []
+  setPublicCacheHeaders(event, 60)
+  setHeader(event, 'x-catalog-source', 'api')
 
-    const source = await setCatalogSourceHeader(event)
-    return {
-      products,
-      items: products,
-      pagination: { page, limit, total, totalPages },
-      source,
-    }
-  } catch (e: unknown) {
-    const err = e as { statusCode?: number; message?: string }
-    const message = err?.message ?? ''
-
-    if (message.includes('CATALOG_DB binding')) {
-      console.error('[api/products] D1 binding missing')
-      throw createError({
-        statusCode: 503,
-        message: 'Catálogo edge (D1) no disponible. Revisa el binding CATALOG_DB en Workers.',
-      })
-    }
-
-    if (err.statusCode === 503) {
-      throw createError({ statusCode: 503, message: err.message ?? 'Catálogo no disponible' })
-    }
-
-    console.error('[api/products]', e)
-    throw createError({
-      statusCode: 503,
-      message: message.includes('timeout')
-        ? 'El catálogo tardó demasiado. Inténtalo de nuevo.'
-        : 'Catálogo no disponible temporalmente.',
-    })
+  return {
+    products,
+    items: products,
+    pagination: data.pagination,
+    source: 'api' as const,
   }
 })

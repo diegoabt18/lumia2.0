@@ -3,7 +3,7 @@ import type { Product } from '#shared/types/product'
 interface ProductsResponse {
   products?: Product[]
   items?: Product[]
-  source?: 'd1' | 'mongo'
+  source?: 'api'
   pagination?: { page: number; limit: number; total: number; totalPages: number }
 }
 
@@ -36,7 +36,7 @@ export function useCatalog() {
     const list = res.products?.length ? res.products : res.items ?? []
     return {
       products: list,
-      source: (res.source ?? 'd1') as 'd1' | 'mongo',
+      source: 'api' as const,
       pagination: res.pagination ?? {
         page,
         limit,
@@ -47,11 +47,11 @@ export function useCatalog() {
   }
 
   async function fetchProductBySlug(slug: string) {
-    const res = await $fetch<{ product: Product | null; source?: 'd1' | 'mongo' }>(
+    const res = await $fetch<{ product: Product | null; source?: 'api' }>(
       `/api/products/${encodeURIComponent(slug)}`,
-      { timeout: 15_000 }
+      { timeout: 15_000 },
     )
-    return { product: res.product ?? null, source: res.source ?? 'd1' }
+    return { product: res.product ?? null, source: 'api' as const }
   }
 
   return { fetchProducts, fetchProductBySlug }

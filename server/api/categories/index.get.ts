@@ -1,15 +1,11 @@
-import { getCategoriesCached } from '../../utils/categories-cache'
-import { setCatalogSourceHeader } from '../../utils/catalog-response'
+import { lumiaApiFetch } from '../../utils/lumia-api-client'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
 
 export default defineEventHandler(async (event) => {
-  try {
-    const categories = await getCategoriesCached(event)
-    setPublicCacheHeaders(event, 120)
-    const source = await setCatalogSourceHeader(event)
-    return { categories, items: categories, source }
-  } catch (e) {
-    console.error('[api/categories]', e)
-    throw createError({ statusCode: 503, message: 'Categorías no disponibles' })
-  }
+  const data = await lumiaApiFetch<{ categories?: unknown[]; items?: unknown[] }>(event, '/api/categories')
+  const categories = data.categories?.length ? data.categories : data.items ?? []
+
+  setPublicCacheHeaders(event, 120)
+  setHeader(event, 'x-catalog-source', 'api')
+  return { categories, items: categories, source: 'api' as const }
 })

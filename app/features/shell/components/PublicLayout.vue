@@ -21,7 +21,7 @@ onMounted(() => {
     const payload = await $fetch<{ items: CartItem[]; source?: string }>('/api/cart', { timeout: 5_000 }).catch(
       () => ({ items: [], source: 'local' as const })
     )
-    if (payload.source === 'mongo') {
+    if (payload.source === 'api' || payload.source === 'mongo') {
       cartStore.$patch({ items: payload.items ?? [], apiEnabled: true })
     } else if (payload.source === 'local') {
       cartStore.$patch({ apiEnabled: false })

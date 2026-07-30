@@ -1,9 +1,5 @@
 import { fileURLToPath } from 'node:url'
 
-const mongoOptionalDepStub = fileURLToPath(
-  new URL('./server/utils/stubs/mongodb-optional-dep.ts', import.meta.url)
-)
-
 const googleFontsUrl =
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap'
 
@@ -106,29 +102,12 @@ export default defineNuxtConfig({
           }
         : {}),
     },
-    alias: {
-      '@aws-sdk/credential-providers': mongoOptionalDepStub,
-      aws4: mongoOptionalDepStub,
-      kerberos: mongoOptionalDepStub,
-      'gcp-metadata': mongoOptionalDepStub,
-      snappy: mongoOptionalDepStub,
-      socks: mongoOptionalDepStub,
-      '@mongodb-js/zstd': mongoOptionalDepStub,
-      'mongodb-client-encryption': mongoOptionalDepStub,
-    },
   },
 
   runtimeConfig: {
-    jwtSecret: '',
-    jwtRefreshSecret: '',
+    /** Base URL del backend Fastify (ej. https://api.lumiadalistore.com). */
+    apiBaseUrl: '',
     siteUrl: '',
-    mongoAuthUri: '',
-    mongoCatalogUri: '',
-    mongoSalesUri: '',
-    /** Fuente de lectura del catálogo: mongo | d1 | auto (prefiere D1 si el binding existe). */
-    catalogSource: 'auto' as 'mongo' | 'd1' | 'auto',
-    googleClientId: '',
-    googleClientSecret: '',
     resendApiKey: '',
     /** Remitente Resend, ej. LUMIA <pedidos@tudominio.com> */
     resendFrom: '',
@@ -137,19 +116,7 @@ export default defineNuxtConfig({
     turnstileSecretKey: '',
     mpAccessToken: '',
     mpWebhookSecret: '',
-    /** Prefijo legible en `orderNumber` (ej. ORD, CEN). */
     orderNumberPrefix: 'ORD',
-    /** TTL en horas para expiración de órdenes con pago Mercado Pago. */
-    orderPaymentTtlHours: 24,
-    /** TTL en horas para expiración de órdenes con pago manual. */
-    orderManualPaymentTtlHours: 72,
-    /** Secreto para cron jobs (`Authorization: Bearer` o header `X-Cron-Secret`). */
-    cronSecret: '',
-    /**
-     * Reservar stock en checkout (consulta catalog_db).
-     * Pon `0` o `false` si Mongo catálogo es lento desde Workers; el stock ya se validó al añadir al carrito.
-     */
-    checkoutReserveStock: '1',
 
     public: {
       storeCurrency: 'COP',

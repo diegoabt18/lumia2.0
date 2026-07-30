@@ -1,6 +1,3 @@
-import { clearSessionCookie } from '../../utils/session'
+import { proxyToLumiaApi } from '../../utils/lumia-api-client'
 
-export default defineEventHandler(async (event) => {
-  clearSessionCookie(event)
-  return { ok: true }
-})
+export default defineEventHandler(async (event) => proxyToLumiaApi(event, '/api/auth/logout'))
