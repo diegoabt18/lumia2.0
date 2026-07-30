@@ -4,7 +4,7 @@ import { listCatalogProducts, type CatalogSort } from '../core/catalog/catalog-l
 import { getCached } from './memory-cache'
 
 const TTL_DEFAULT_MS = 90_000
-const TTL_FILTERED_MS = 60_000
+const TTL_FILTERED_MS = 120_000
 const TTL_HEAVY_MS = 45_000
 
 function listingCacheKey(options: {

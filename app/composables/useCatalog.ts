@@ -8,13 +8,18 @@ interface ProductsResponse {
 }
 
 async function fetchWithRetry<T>(url: string, options: { query?: Record<string, unknown>; timeout?: number }): Promise<T> {
-  try {
-    return (await $fetch(url, { ...options, timeout: options.timeout ?? 8_000 })) as T
-  } catch (error) {
-    const status = (error as { statusCode?: number })?.statusCode
-    if (status !== 503 && status !== 504) throw error
-    return (await $fetch(url, { ...options, timeout: 10_000 })) as T
+  const attempts = [options.timeout ?? 12_000, 15_000, 18_000]
+  let lastError: unknown
+  for (const timeout of attempts) {
+    try {
+      return (await $fetch(url, { ...options, timeout })) as T
+    } catch (error) {
+      lastError = error
+      const status = (error as { statusCode?: number })?.statusCode
+      if (status !== 503 && status !== 504 && status !== 408) throw error
+    }
   }
+  throw lastError
 }
 
 export function useCatalog() {
@@ -40,7 +45,7 @@ export function useCatalog() {
         promo: query.promo,
         sort: query.sort,
       },
-      timeout: 8_000,
+      timeout: 12_000,
     })
 
     const list = res.products?.length ? res.products : res.items ?? []
@@ -58,7 +63,7 @@ export function useCatalog() {
 
   async function fetchProductBySlug(slug: string) {
     const res = await fetchWithRetry<{ product: Product | null }>(`/api/products/${slug}`, {
-      timeout: 8_000,
+      timeout: 12_000,
     })
     return { product: res.product ?? null, source: (res as { source?: 'd1' | 'mongo' }).source ?? 'd1' }
   }

@@ -1,5 +1,4 @@
 import type { CatalogSort } from '../../core/catalog/catalog-listing'
-import { getResolvedCatalogSource } from '../../core/catalog/application/catalog-reader'
 import { listCatalogProductsCached } from '../../utils/catalog-listing-cache'
 import { setCatalogSourceHeader } from '../../utils/catalog-response'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
@@ -40,7 +39,7 @@ export default defineEventHandler(async (event) => {
         },
         event
       ),
-      10_000,
+      15_000,
       'catalog list'
     )
     const totalPages = Math.max(1, Math.ceil(total / limit))

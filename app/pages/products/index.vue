@@ -131,8 +131,15 @@
           <div
             v-else-if="displayProducts.length"
             class="relative grid grid-cols-2 gap-x-1.5 gap-y-3 sm:gap-x-6 sm:gap-y-5 lg:grid-cols-3 lg:gap-8"
-            :class="pending ? 'opacity-70' : ''"
+            :class="pending || catalogRetrying ? 'opacity-70' : ''"
           >
+            <p
+              v-if="catalogRetrying"
+              class="col-span-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900"
+            >
+              No se pudo actualizar el filtro. Mostrando la vista anterior —
+              <button type="button" class="font-semibold underline" @click="refresh()">reintentar</button>
+            </p>
             <ProductCardPremium
               v-for="(p, i) in displayProducts"
               :key="p.id"
@@ -333,7 +340,7 @@ function catalogQuery() {
     if (!slugs.length) {
       return Promise.resolve({
         products: [] as Product[],
-        source: 'mongodb' as const,
+        source: 'd1' as const,
         pagination: { page: 1, limit: 30, total: 0, totalPages: 1 },
       })
     }
@@ -361,9 +368,10 @@ const { data, pending, error, refresh } = useAsyncData(
   {
     watch: [catalogFetchKey],
     lazy: true,
+    keepPreviousData: true,
     default: () => ({
       products: [] as Product[],
-      source: 'mongodb' as const,
+      source: 'd1' as const,
       pagination: { page: 1, limit: 12, total: 0, totalPages: 1 },
     }),
   }
@@ -380,7 +388,10 @@ const displayProducts = computed(() => {
   return products.value
 })
 const pagination = computed(() => data.value?.pagination)
-const catalogLoadFailed = computed(() => Boolean(error.value) && !pending.value && !displayProducts.value.length)
+const catalogLoadFailed = computed(
+  () => Boolean(error.value) && !pending.value && !displayProducts.value.length
+)
+const catalogRetrying = computed(() => Boolean(error.value) && Boolean(displayProducts.value.length))
 
 const rangeStart = computed(() => {
   if (!pagination.value?.total) return 0
