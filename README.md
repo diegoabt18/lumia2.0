@@ -68,7 +68,8 @@ Cada carpeta tiene su `README.md`:
 ```bash
 npm run db:d1:setup              # aplica 001_catalog_schema.sql en local
 npm run db:d1:create             # crea lumia-catalog en Cloudflare (pega database_id en wrangler.jsonc)
-npm run db:d1:migrate:remote     # schema remoto
+npm run db:d1:migrate:remote     # schema remoto (una vez)
+npm run cf:deploy:prod           # incluye binding CATALOG_DB en applumia2
 # Dashboard → D1 → lumia-catalog → Enable Read Replication
 ```
 

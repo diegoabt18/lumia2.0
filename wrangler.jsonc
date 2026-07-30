@@ -41,6 +41,13 @@
   "env": {
     "production": {
       "name": "applumia2",
+      "d1_databases": [
+        {
+          "binding": "CATALOG_DB",
+          "database_name": "lumia-catalog",
+          "database_id": "c7feccb5-1076-4d9c-a129-da86fc5e1d74"
+        }
+      ],
       "vars": {
         "NUXT_CATALOG_SOURCE": "auto",
         "NUXT_SITE_URL": "https://lumiadalistore.com",
