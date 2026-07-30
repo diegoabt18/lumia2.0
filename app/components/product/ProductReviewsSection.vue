@@ -138,7 +138,8 @@ const { data, pending, refresh } = useAsyncData(
     if (!shouldLoad.value) return null
     return $fetch<FeedbackPayload>(`/api/products/${encodeURIComponent(props.slug)}/feedback`, {
       query: { page: page.value, limit: 8 },
-    })
+      timeout: 6_000,
+    }).catch(() => null)
   },
   { watch: [shouldLoad, page], server: false, immediate: false }
 )
