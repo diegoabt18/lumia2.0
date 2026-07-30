@@ -36,6 +36,8 @@ watch(cartBootstrap, (payload) => {
 }, { immediate: true })
 
 onMounted(() => {
-  void useWishlist().load()
+  if (useAuth().user.value) {
+    void useWishlist().load()
+  }
 })
 </script>

@@ -35,7 +35,7 @@ export function useWishlist() {
     loadPromise = (async () => {
       try {
         if (auth.user.value) {
-          const res = await $fetch<{ slugs: string[] }>('/api/account/favorites')
+          const res = await $fetch<{ slugs: string[] }>('/api/account/favorites', { timeout: 4_000 })
           slugs.value = res.slugs ?? []
         } else {
           slugs.value = readLocalSlugs()
