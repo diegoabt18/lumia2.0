@@ -332,17 +332,67 @@ const catalogFetchKey = computed(() => {
   return `${page.value}-${limit.value}-${searchApplied.value}-${selectedCategory.value}-${sortKey}-${promoKey}`
 })
 
+type CatalogView = {
+  products: Product[]
+  source: 'd1' | 'mongo'
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+}
+
+function emptyCatalogView(): CatalogView {
+  return {
+    products: [],
+    source: 'd1',
+    pagination: { page: 1, limit: 12, total: 0, totalPages: 1 },
+  }
+}
+
+/** Categoría y paginación simple → filtro local (sin round-trip al Worker). */
+const needsServerCatalog = computed(
+  () =>
+    favoritesOnly.value ||
+    promoOnly.value ||
+    Boolean(searchApplied.value) ||
+    sortBy.value !== '--'
+)
+
+const {
+  data: catalogSnapshot,
+  pending: snapshotPending,
+  error: snapshotError,
+  refresh: refreshSnapshot,
+} = useAsyncData('catalog-snapshot', () => catalog.fetchProducts({ limit: 100, page: 1 }), {
+  lazy: true,
+  default: () => emptyCatalogView(),
+})
+
+const clientCatalog = computed((): CatalogView | null => {
+  if (needsServerCatalog.value) return null
+  const all = catalogSnapshot.value?.products ?? []
+  if (!all.length) return null
+
+  const list = selectedCategory.value
+    ? all.filter((p) => p.categorySlug === selectedCategory.value)
+    : all
+
+  const total = list.length
+  const totalPages = Math.max(1, Math.ceil(total / limit.value))
+  const safePage = Math.min(page.value, totalPages)
+  const start = (safePage - 1) * limit.value
+
+  return {
+    products: list.slice(start, start + limit.value),
+    source: catalogSnapshot.value?.source ?? 'd1',
+    pagination: { page: safePage, limit: limit.value, total, totalPages },
+  }
+})
+
 function catalogQuery() {
   const sort = sortBy.value !== '--' ? sortBy.value : undefined
   const promo = promoOnly.value ? '1' : undefined
   if (favoritesOnly.value) {
     const slugs = wishlistSlugs.value
     if (!slugs.length) {
-      return Promise.resolve({
-        products: [] as Product[],
-        source: 'd1' as const,
-        pagination: { page: 1, limit: 30, total: 0, totalPages: 1 },
-      })
+      return Promise.resolve(emptyCatalogView())
     }
     return catalog.fetchProducts({
       slugs: slugs.join(','),
@@ -362,32 +412,44 @@ function catalogQuery() {
   })
 }
 
-const { data, pending, error, refresh } = useAsyncData(
-  'catalog-list',
-  () => catalogQuery(),
-  {
-    watch: [catalogFetchKey],
-    lazy: true,
-    keepPreviousData: true,
-    default: () => ({
-      products: [] as Product[],
-      source: 'd1' as const,
-      pagination: { page: 1, limit: 12, total: 0, totalPages: 1 },
-    }),
-  }
+const {
+  data: serverCatalog,
+  pending: serverPending,
+  error: serverError,
+  refresh: refreshServer,
+} = useAsyncData('catalog-list', () => catalogQuery(), {
+  watch: [catalogFetchKey],
+  lazy: true,
+  immediate: false,
+  default: () => emptyCatalogView(),
+})
+
+watch(
+  needsServerCatalog,
+  (need) => {
+    if (need) void refreshServer()
+  },
+  { immediate: true }
 )
 
-const products = computed(() => data.value?.products ?? [])
-const staleProducts = ref<Product[]>([])
-watch(products, (list) => {
-  if (list.length) staleProducts.value = list
+const activeCatalog = computed(() => {
+  if (!needsServerCatalog.value) {
+    return clientCatalog.value ?? emptyCatalogView()
+  }
+  return serverCatalog.value ?? emptyCatalogView()
 })
-const displayProducts = computed(() => {
-  if (products.value.length) return products.value
-  if (pending.value && staleProducts.value.length) return staleProducts.value
-  return products.value
-})
-const pagination = computed(() => data.value?.pagination)
+
+const pending = computed(() => (needsServerCatalog.value ? serverPending.value : snapshotPending.value))
+const error = computed(() => (needsServerCatalog.value ? serverError.value : snapshotError.value))
+
+const displayProducts = computed(() => activeCatalog.value.products)
+const pagination = computed(() => activeCatalog.value.pagination)
+
+function refresh() {
+  if (needsServerCatalog.value) return refreshServer()
+  return refreshSnapshot()
+}
+
 const catalogLoadFailed = computed(
   () => Boolean(error.value) && !pending.value && !displayProducts.value.length
 )
