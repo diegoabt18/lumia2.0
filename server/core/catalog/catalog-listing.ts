@@ -1,5 +1,6 @@
+import type { H3Event } from 'h3'
 import type { Product } from '#shared/types/product'
-import { listProductsPage } from './infrastructure/product.repository'
+import { listProductsPage } from './application/catalog-reader'
 
 export type CatalogSort = 'featured' | 'name-asc' | 'price-asc' | 'price-desc'
 
@@ -33,35 +34,44 @@ function sortProducts(products: Product[], sort: CatalogSort): Product[] {
   return list
 }
 
-export async function listCatalogProducts(options: {
-  limit: number
-  skip: number
-  search?: string
-  categorySlugs?: string[]
-  productSlugs?: string[]
-  promoOnly?: boolean
-  sort?: CatalogSort
-}): Promise<{ products: Product[]; total: number }> {
+export async function listCatalogProducts(
+  options: {
+    limit: number
+    skip: number
+    search?: string
+    categorySlugs?: string[]
+    productSlugs?: string[]
+    promoOnly?: boolean
+    sort?: CatalogSort
+  },
+  event?: H3Event
+): Promise<{ products: Product[]; total: number }> {
   const sort = options.sort ?? 'featured'
   const needsPostProcess = Boolean(options.promoOnly) || sort !== 'featured'
 
   if (!needsPostProcess) {
-    return listProductsPage({
-      limit: options.limit,
-      skip: options.skip,
+    return listProductsPage(
+      {
+        limit: options.limit,
+        skip: options.skip,
+        search: options.search,
+        categorySlugs: options.categorySlugs,
+        productSlugs: options.productSlugs,
+      },
+      event
+    )
+  }
+
+  const { products } = await listProductsPage(
+    {
+      limit: MAX_CATALOG_PROCESS,
+      skip: 0,
       search: options.search,
       categorySlugs: options.categorySlugs,
       productSlugs: options.productSlugs,
-    })
-  }
-
-  const { products } = await listProductsPage({
-    limit: MAX_CATALOG_PROCESS,
-    skip: 0,
-    search: options.search,
-    categorySlugs: options.categorySlugs,
-    productSlugs: options.productSlugs,
-  })
+    },
+    event
+  )
 
   let processed = options.promoOnly ? products.filter(productHasPromo) : products
   processed = sortProducts(processed, sort)

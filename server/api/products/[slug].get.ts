@@ -1,4 +1,4 @@
-import { getProductBySlug } from '../../core/catalog/infrastructure/product.repository'
+import { getProductBySlug, getResolvedCatalogSource } from '../../core/catalog/application/catalog-reader'
 import { withServerTimeout } from '../../utils/server-timeout'
 
 export default defineEventHandler(async (event) => {
@@ -8,11 +8,11 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const product = await withServerTimeout(getProductBySlug(slug), 8_000, 'product detail')
+    const product = await withServerTimeout(getProductBySlug(slug, event), 8_000, 'product detail')
     if (!product) {
       throw createError({ statusCode: 404, message: 'Producto no encontrado' })
     }
-    return { product, source: 'mongodb' as const }
+    return { product, source: await getResolvedCatalogSource(event) }
   } catch (e: unknown) {
     const err = e as { statusCode?: number; message?: string }
     if (err.statusCode === 404 || err.statusCode === 503) throw e

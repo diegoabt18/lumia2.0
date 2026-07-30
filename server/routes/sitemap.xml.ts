@@ -1,15 +1,14 @@
+import type { H3Event } from 'h3'
 import { LEGAL_SLUGS } from '#shared/legal/content'
-import { listProductsPage } from '../core/catalog/infrastructure/product.repository'
-import { isCatalogDbConfigured } from '../database/catalog'
+import { listProductsPage, isCatalogReadConfigured } from '../core/catalog/application/catalog-reader'
 
-async function loadAllProductPaths(): Promise<string[]> {
-  const paths: string[] = []
+async function loadAllProductPaths(event: H3Event): Promise<string[]> {  const paths: string[] = []
   const pageSize = 100
   let skip = 0
   let total = Number.POSITIVE_INFINITY
 
   while (skip < total) {
-    const { products, total: count } = await listProductsPage({ limit: pageSize, skip })
+    const { products, total: count } = await listProductsPage({ limit: pageSize, skip }, event)
     total = count
     if (!products.length) break
     paths.push(...products.map((p) => `/products/${encodeURIComponent(p.slug)}`))
@@ -28,9 +27,9 @@ export default defineEventHandler(async (event) => {
   const legalPaths = LEGAL_SLUGS.map((s) => `/legal/${s}`)
 
   let productPaths: string[] = []
-  if (isCatalogDbConfigured()) {
+  if (isCatalogReadConfigured(event)) {
     try {
-      productPaths = await loadAllProductPaths()
+      productPaths = await loadAllProductPaths(event)
     } catch {
       /* catálogo offline → sitemap estático */
     }

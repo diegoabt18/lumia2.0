@@ -1,3 +1,4 @@
+import type { H3Event } from 'h3'
 import type { Product } from '#shared/types/product'
 import { listCatalogProducts, type CatalogSort } from '../core/catalog/catalog-listing'
 import { getCached } from './memory-cache'
@@ -42,16 +43,19 @@ function listingTtlMs(options: {
   return TTL_DEFAULT_MS
 }
 
-export async function listCatalogProductsCached(options: {
-  limit: number
-  skip: number
-  search?: string
-  categorySlugs?: string[]
-  productSlugs?: string[]
-  promoOnly?: boolean
-  sort?: CatalogSort
-}): Promise<{ products: Product[]; total: number }> {
+export async function listCatalogProductsCached(
+  options: {
+    limit: number
+    skip: number
+    search?: string
+    categorySlugs?: string[]
+    productSlugs?: string[]
+    promoOnly?: boolean
+    sort?: CatalogSort
+  },
+  event?: H3Event
+): Promise<{ products: Product[]; total: number }> {
   const key = listingCacheKey(options)
   const ttlMs = listingTtlMs(options)
-  return getCached(key, ttlMs, () => listCatalogProducts(options))
+  return getCached(key, ttlMs, () => listCatalogProducts(options, event))
 }

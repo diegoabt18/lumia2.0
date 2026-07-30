@@ -1,4 +1,5 @@
 import type { CatalogSort } from '../../core/catalog/catalog-listing'
+import { getResolvedCatalogSource } from '../../core/catalog/application/catalog-reader'
 import { listCatalogProductsCached } from '../../utils/catalog-listing-cache'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
 import { withServerTimeout } from '../../utils/server-timeout'
@@ -26,15 +27,18 @@ export default defineEventHandler(async (event) => {
 
   try {
     const { products, total } = await withServerTimeout(
-      listCatalogProductsCached({
-        limit,
-        skip,
-        search,
-        categorySlugs,
-        productSlugs,
-        promoOnly,
-        sort,
-      }),
+      listCatalogProductsCached(
+        {
+          limit,
+          skip,
+          search,
+          categorySlugs,
+          productSlugs,
+          promoOnly,
+          sort,
+        },
+        event
+      ),
       10_000,
       'catalog list'
     )
@@ -48,7 +52,7 @@ export default defineEventHandler(async (event) => {
       products,
       items: products,
       pagination: { page, limit, total, totalPages },
-      source: 'mongodb' as const,
+      source: await getResolvedCatalogSource(event),
     }
   } catch (e: unknown) {
     const err = e as { statusCode?: number; message?: string }

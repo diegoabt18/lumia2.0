@@ -23,7 +23,11 @@
     "cf:types": "wrangler types",
     "cf:tail": "wrangler tail",
     "cf:tail:prod": "wrangler tail --env production",
-    "db:indexes": "node scripts/ensure-atlas-indexes.mjs"
+    "db:indexes": "node scripts/ensure-atlas-indexes.mjs",
+    "db:d1:create": "wrangler d1 create lumia-catalog",
+    "db:d1:migrate": "wrangler d1 execute lumia-catalog --local --file=scripts/migrations/001_catalog_schema.sql",
+    "db:d1:migrate:remote": "wrangler d1 execute lumia-catalog --remote --file=scripts/migrations/001_catalog_schema.sql",
+    "db:d1:setup": "node scripts/d1-setup-catalog.mjs"
   },
   "dependencies": {
     "@nuxt/image": "^2.1.0",
@@ -42,6 +46,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
+    "nitro-cloudflare-dev": "^0.2.2",
     "postcss": "^8.5.3",
     "tailwindcss": "~3.4.19",
     "typescript": "~5.9.3",

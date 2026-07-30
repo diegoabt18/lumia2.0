@@ -60,7 +60,14 @@
                 Entrar
               </NuxtLink>
             </div>
-            <div v-else-if="isHydrated && auth.user.value" class="hidden sm:block">
+            <div v-else-if="isHydrated && auth.user.value" class="hidden items-center gap-2 sm:flex">
+              <NuxtLink
+                v-if="auth.user.value.role === 'admin'"
+                to="/admin/migration"
+                class="rounded-full border border-lumia-gold/35 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-lumia-ink/75 transition-colors hover:border-lumia-gold/60 hover:bg-lumia-beige/40"
+              >
+                Admin
+              </NuxtLink>
               <NuxtLink
                 to="/account"
                 class="rounded-full border border-lumia-ink/15 px-4 py-2 text-sm font-medium text-lumia-ink/85 transition-colors hover:border-lumia-gold/40"
@@ -100,6 +107,14 @@
               @click="mobileOpen = false"
             >
               {{ link.label }}
+            </NuxtLink>
+            <NuxtLink
+              v-if="isHydrated && auth.user.value?.role === 'admin'"
+              to="/admin/migration"
+              class="flex min-h-11 items-center px-4 text-sm font-medium text-lumia-gold hover:bg-lumia-beige/30"
+              @click="mobileOpen = false"
+            >
+              Admin · Migración
             </NuxtLink>
             <NuxtLink
               :to="loginHref"

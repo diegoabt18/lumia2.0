@@ -10,7 +10,7 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
-  modules: ['@pinia/nuxt', '@nuxt/image', '@vueuse/nuxt'],
+  modules: ['nitro-cloudflare-dev', '@pinia/nuxt', '@nuxt/image', '@vueuse/nuxt'],
 
   css: ['~/assets/css/main.css'],
 
@@ -72,6 +72,9 @@ export default defineNuxtConfig({
 
   nitro: {
     preset: 'cloudflare_module',
+    cloudflareDev: {
+      configPath: 'wrangler.jsonc',
+    },
     routeRules: {
       '/': { swr: 120 },
       '/api/categories': { swr: 900 },
@@ -98,6 +101,8 @@ export default defineNuxtConfig({
     mongoAuthUri: '',
     mongoCatalogUri: '',
     mongoSalesUri: '',
+    /** Fuente de lectura del catálogo: mongo | d1 | auto (prefiere D1 si el binding existe). */
+    catalogSource: 'auto' as 'mongo' | 'd1' | 'auto',
     googleClientId: '',
     googleClientSecret: '',
     resendApiKey: '',

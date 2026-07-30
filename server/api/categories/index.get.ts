@@ -3,7 +3,7 @@ import { setPublicCacheHeaders } from '../../utils/memory-cache'
 
 export default defineEventHandler(async (event) => {
   try {
-    const categories = await getCategoriesCached()
+    const categories = await getCategoriesCached(event)
     setPublicCacheHeaders(event, 120)
     return { categories, items: categories }
   } catch (e) {

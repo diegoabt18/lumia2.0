@@ -12,8 +12,18 @@
   "observability": {
     "enabled": true
   },
+  // D1 catálogo (lectura edge). Tras `npm run db:d1:create`, pega aquí el database_id.
+  // Read replication: Dashboard → D1 → lumia-catalog → Settings → Enable Read Replication.
+  "d1_databases": [
+    {
+      "binding": "CATALOG_DB",
+      "database_name": "lumia-catalog",
+      "database_id": "c7feccb5-1076-4d9c-a129-da86fc5e1d74"
+    }
+  ],
   // Variables no secretas. Secretos → `npm run cf:secrets:prod`.
   "vars": {
+    "NUXT_CATALOG_SOURCE": "auto",
     "NUXT_SITE_URL": "http://localhost:8787",
     "NUXT_PUBLIC_STORE_CURRENCY": "COP",
     "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
@@ -32,6 +42,7 @@
     "production": {
       "name": "applumia2",
       "vars": {
+        "NUXT_CATALOG_SOURCE": "auto",
         "NUXT_SITE_URL": "https://lumiadalistore.com",
         "NUXT_PUBLIC_STORE_CURRENCY": "COP",
         "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
