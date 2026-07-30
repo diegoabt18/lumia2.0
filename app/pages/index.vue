@@ -3,11 +3,11 @@
     <HomeHero />
     <HomeFeaturedProducts :items="featuredItems" :loading="featuredPending" />
     <HomeCategoryGrid />
-    <HomeBrandStory />
-    <HomeBenefits />
-    <HomeTestimonials />
-    <HomeInstaGallery />
-    <HomeNewsletterSection />
+    <LazyHomeBrandStory />
+    <LazyHomeBenefits />
+    <LazyHomeTestimonials />
+    <LazyHomeInstaGallery />
+    <LazyHomeNewsletterSection />
   </div>
 </template>
 
@@ -87,7 +87,7 @@ useAsyncData(
     if (res.categories?.length) categoryStore.hydrate(res.categories)
     return res.categories ?? []
   },
-  { lazy: true, server: false }
+  { lazy: true }
 )
 
 const featuredItems = computed((): Product[] => {

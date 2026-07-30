@@ -34,10 +34,7 @@
         </div>
       </div>
       <div class="border-t border-lumia-cream/10 py-8 text-center text-xs text-lumia-cream/45">
-        © {{ year }} LUMIA · Velas y decoración ·
-        <NuxtLink to="/design-system" class="underline decoration-lumia-cream/30 hover:text-lumia-cream/70">
-          Sistema de diseño
-        </NuxtLink>
+        © {{ year }} LUMIA · Velas y decoración
       </div>
     </BaseContainer>
   </footer>

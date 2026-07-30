@@ -318,7 +318,6 @@ const {
   error: snapshotError,
   refresh: refreshSnapshot,
 } = useAsyncData('catalog-snapshot', () => catalog.fetchProducts({ limit: 100, page: 1 }), {
-  lazy: true,
   default: () => emptyCatalogView(),
 })
 

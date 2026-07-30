@@ -210,16 +210,28 @@ async function onSubmit() {
 
   isSubmitting.value = true
   try {
-    const result = await $fetch<{
+    const fetchOpts = {
+      method: 'POST' as const,
+      headers: { 'Idempotency-Key': idempotencyKey.value },
+      body: parsed.data,
+      timeout: 45_000,
+    }
+
+    let result: {
       orderNumber: string
       total: number
       paymentStatus: string
       accessToken: string
-    }>('/api/orders/create', {
-      method: 'POST',
-      headers: { 'Idempotency-Key': idempotencyKey.value },
-      body: parsed.data,
-    })
+    }
+
+    try {
+      result = await $fetch('/api/orders/create', fetchOpts)
+    } catch (firstError: unknown) {
+      const status = (firstError as { statusCode?: number })?.statusCode
+      if (status !== 503) throw firstError
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      result = await $fetch('/api/orders/create', fetchOpts)
+    }
 
     await clearCart()
     idempotencyKey.value = crypto.randomUUID()

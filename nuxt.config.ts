@@ -4,11 +4,22 @@ const mongoOptionalDepStub = fileURLToPath(
   new URL('./server/utils/stubs/mongodb-optional-dep.ts', import.meta.url)
 )
 
+const googleFontsUrl =
+  'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2026-07-28',
 
-  devtools: { enabled: true },
+  devtools: { enabled: process.env.NODE_ENV === 'development' },
+
+  experimental: {
+    defaults: {
+      nuxtLink: {
+        prefetch: false,
+      },
+    },
+  },
 
   modules: ['nitro-cloudflare-dev', '@pinia/nuxt', '@nuxt/image', '@vueuse/nuxt'],
 
@@ -36,10 +47,13 @@ export default defineNuxtConfig({
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap',
+          rel: 'preload',
+          as: 'style',
+          href: googleFontsUrl,
+          onload: "this.onload=null;this.rel='stylesheet'",
         },
       ],
+      noscript: [{ innerHTML: `<link rel="stylesheet" href="${googleFontsUrl}">` }],
     },
   },
 
@@ -63,7 +77,7 @@ export default defineNuxtConfig({
   ],
 
   imports: {
-    dirs: ['composables', 'features/**/composables'],
+    dirs: ['composables', 'features/**/composables', 'utils'],
   },
 
   pinia: {
@@ -77,10 +91,13 @@ export default defineNuxtConfig({
     },
     routeRules: {
       '/': { swr: 120 },
+      '/design-system': { redirect: { to: '/admin/design-system', statusCode: 301 } },
       '/api/categories': { swr: 900 },
       '/api/products': { swr: 120 },
+      '/api/products/**': { swr: 120 },
       '/api/cdn/images': { swr: 300 },
       '/products': { swr: 180 },
+      '/products/**': { swr: 180 },
     },
     alias: {
       '@aws-sdk/credential-providers': mongoOptionalDepStub,

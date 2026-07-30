@@ -28,7 +28,6 @@ export async function findIdempotentOrder(
 ): Promise<IdempotentOrderResponse | null> {
   const db = await getSalesDb()
   const now = new Date()
-  await db.collection(COL).deleteMany({ expiresAt: { $lt: now } })
   const row = await db.collection<IdempotencyDoc>(COL).findOne({
     _id: key,
     cartKey,

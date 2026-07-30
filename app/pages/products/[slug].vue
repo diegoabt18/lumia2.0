@@ -176,7 +176,7 @@
           </div>
         </div>
 
-        <ProductReviewsSection
+        <LazyProductReviewsSection
           v-if="product"
           :slug="product.slug"
           :initial-average="product.averageRating ?? null"
@@ -244,7 +244,7 @@ const { data: detailData, pending: productPending } = useAsyncData(
     $fetch<{ product: Product | null }>(`/api/products/${encodeURIComponent(slugParam.value)}`, {
       timeout: 8_000,
     }).catch(() => ({ product: null })),
-  { watch: [slugParam], lazy: true, default: () => ({ product: null }) }
+  { watch: [slugParam], default: () => ({ product: null }) }
 )
 
 const { fetchProducts } = useCatalog()

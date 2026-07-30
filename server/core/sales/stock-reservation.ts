@@ -1,4 +1,4 @@
-import type { ObjectId } from 'mongodb'
+import type { Db } from 'mongodb'
 import type { CartItem } from '#shared/types/product'
 import type { VariantDoc } from '../catalog/infrastructure/product.repository'
 
@@ -6,7 +6,7 @@ export interface StockReservationLine {
   sku: string
   quantity: number
   source: 'inventory' | 'variant'
-  inventoryId?: ObjectId
+  inventoryId?: import('mongodb').ObjectId
 }
 
 interface StockMeta {
@@ -15,11 +15,9 @@ interface StockMeta {
   hasInventoryRow: boolean
 }
 
-async function loadStockMeta(skus: string[]): Promise<Map<string, StockMeta>> {
-  const { isCatalogDbConfigured, getCatalogDb } = await import('../../database/catalog')
-  if (!isCatalogDbConfigured() || !skus.length) return new Map()
+async function loadStockMeta(db: Db, skus: string[]): Promise<Map<string, StockMeta>> {
+  if (!skus.length) return new Map()
 
-  const db = await getCatalogDb()
   const rows = await db
     .collection<VariantDoc>('variants')
     .aggregate<StockMeta>([
@@ -52,7 +50,7 @@ async function loadStockMeta(skus: string[]): Promise<Map<string, StockMeta>> {
 }
 
 async function reserveInventorySku(
-  db: Awaited<ReturnType<typeof import('../../database/catalog').getCatalogDb>>,
+  db: Db,
   sku: string,
   quantity: number
 ): Promise<StockReservationLine[] | null> {
@@ -94,7 +92,7 @@ async function reserveInventorySku(
       sku,
       quantity: take,
       source: 'inventory',
-      inventoryId: doc._id as ObjectId,
+      inventoryId: doc._id as import('mongodb').ObjectId,
     })
     remaining -= take
   }
@@ -107,11 +105,7 @@ async function reserveInventorySku(
   return reservations
 }
 
-async function reserveVariantSku(
-  db: Awaited<ReturnType<typeof import('../../database/catalog').getCatalogDb>>,
-  sku: string,
-  quantity: number
-): Promise<StockReservationLine | null> {
+async function reserveVariantSku(db: Db, sku: string, quantity: number): Promise<StockReservationLine | null> {
   const updated = await db.collection('variants').updateOne(
     {
       sku,
@@ -134,39 +128,43 @@ async function reserveVariantSku(
   return { sku, quantity, source: 'variant' }
 }
 
+async function reserveCartLine(
+  db: Db,
+  meta: Map<string, StockMeta>,
+  item: CartItem
+): Promise<StockReservationLine[]> {
+  const row = meta.get(item.sku)
+  if (!row || row.isMadeToOrder) return []
+
+  const lines = row.hasInventoryRow
+    ? await reserveInventorySku(db, item.sku, item.quantity)
+    : await reserveVariantSku(db, item.sku, item.quantity)
+
+  if (!lines || (Array.isArray(lines) && !lines.length)) {
+    throw createError({
+      statusCode: 409,
+      message: `${item.productName}: el stock cambió mientras confirmabas. Revisa tu carrito.`,
+    })
+  }
+
+  return Array.isArray(lines) ? lines : [lines]
+}
+
 /** Reserva stock de forma atómica antes de crear el pedido. */
 export async function reserveCartStock(items: CartItem[]): Promise<StockReservationLine[]> {
   const { isCatalogDbConfigured, getCatalogDb } = await import('../../database/catalog')
   if (!isCatalogDbConfigured() || !items.length) return []
 
   const skus = [...new Set(items.map((i) => i.sku))]
-  const meta = await loadStockMeta(skus)
   const db = await getCatalogDb()
+  const meta = await loadStockMeta(db, skus)
   const reservations: StockReservationLine[] = []
 
   try {
     for (const item of items) {
-      const row = meta.get(item.sku)
-      if (!row || row.isMadeToOrder) continue
-
-      let lines: StockReservationLine[] | StockReservationLine | null = null
-      if (row.hasInventoryRow) {
-        lines = await reserveInventorySku(db, item.sku, item.quantity)
-      } else {
-        lines = await reserveVariantSku(db, item.sku, item.quantity)
-      }
-
-      if (!lines || (Array.isArray(lines) && !lines.length)) {
-        throw createError({
-          statusCode: 409,
-          message: `${item.productName}: el stock cambió mientras confirmabas. Revisa tu carrito.`,
-        })
-      }
-
-      if (Array.isArray(lines)) reservations.push(...lines)
-      else reservations.push(lines)
+      const lines = await reserveCartLine(db, meta, item)
+      reservations.push(...lines)
     }
-
     return reservations
   } catch (e) {
     await releaseCartStockReservations(reservations)

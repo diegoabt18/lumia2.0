@@ -30,7 +30,7 @@ export function useAuth() {
   }
 
   if (import.meta.client && !loaded.value) {
-    void fetchUser()
+    scheduleIdle(() => fetchUser())
   }
 
   function loginWithGoogle(returnPath = '/', turnstileToken?: string) {

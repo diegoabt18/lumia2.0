@@ -84,12 +84,18 @@ const maxSlides = Math.min(12, Math.max(1, Number(config.public.homeHeroMaxSlide
 const intervalMs = Math.max(3000, Number(config.public.homeHeroSlideIntervalMs) || 5500)
 
 const { data: slideData } = useAsyncData('home-hero-slides', () => discoverHomeHeroSlides(cdnBase, maxSlides), {
-  server: false,
-  lazy: true,
   default: () => [] as string[],
 })
 
 const slides = computed(() => slideData.value ?? [])
+
+useHead(() => {
+  const first = slides.value[0]
+  if (!first) return {}
+  return {
+    link: [{ rel: 'preload', as: 'image', href: first, fetchpriority: 'high' }],
+  }
+})
 const activeIndex = ref(0)
 const prefersReducedMotion = usePreferredReducedMotion()
 

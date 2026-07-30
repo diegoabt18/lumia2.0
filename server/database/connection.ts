@@ -10,7 +10,6 @@ interface MongoPool {
 const pools = new Map<string, MongoPool>()
 const lastPingOkAt = new Map<string, number>()
 const PING_TTL_MS = 30_000
-const WORKERS_PING_TTL_MS = 120_000
 let dnsServersConfigured = false
 
 function isCloudflareWorkersRuntime(): boolean {
@@ -74,7 +73,10 @@ export async function getMongoDb(uri: string, dbName: string): Promise<Db> {
   const existing = pools.get(uri)
 
   if (existing) {
-    const pingTtl = onWorkers ? WORKERS_PING_TTL_MS : PING_TTL_MS
+    // En Workers el ping bloquea cada checkout si el pool caduca; confía en el cliente y reconecta solo al fallar.
+    if (onWorkers) return existing.client.db(dbName)
+
+    const pingTtl = PING_TTL_MS
     const pingFresh = Date.now() - (lastPingOkAt.get(uri) ?? 0) < pingTtl
     if (pingFresh) return existing.client.db(dbName)
     try {

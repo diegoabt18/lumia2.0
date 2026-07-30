@@ -32,9 +32,11 @@ import { quoteStoreShipping } from '../../utils/store-shipping'
 
 import { withServerTimeout } from '../../utils/server-timeout'
 
+import { warmCheckoutMongo } from '../../utils/warm-mongo'
+
 const IDEMPOTENCY_HEADER = 'idempotency-key'
 /** Checkout: varias bases Mongo en una sola petición (carrito + stock + orden). */
-const CHECKOUT_MONGO_TIMEOUT_MS = 28_000
+const CHECKOUT_MONGO_TIMEOUT_MS = 30_000
 
 function readIdempotencyKey(event: H3Event): string | null {
   const raw = getHeader(event, IDEMPOTENCY_HEADER) ?? getHeader(event, 'Idempotency-Key')
@@ -99,7 +101,11 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, message: 'Completa la verificación de seguridad antes de confirmar.' })
       }
       const ip = getRequestIP(event, { xForwardedFor: true })
-      const verified = await verifyTurnstileToken(token, turnstileSecret, ip)
+      const verified = await withServerTimeout(
+        verifyTurnstileToken(token, turnstileSecret, ip),
+        5_000,
+        'turnstile verify'
+      )
       if (!verified) {
         throw createError({
           statusCode: 403,
@@ -107,6 +113,8 @@ export default defineEventHandler(async (event) => {
         })
       }
     }
+
+    await warmCheckoutMongo()
 
     const subject = await resolveCartSubjectForWrite(event)
     if (!subject) throw createError({ statusCode: 401, message: 'No se pudo identificar el carrito' })

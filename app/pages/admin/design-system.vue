@@ -9,9 +9,14 @@ import {
   lumiaTransitions,
 } from '#shared/design-system/tokens'
 
+definePageMeta({
+  layout: 'admin',
+  middleware: 'admin',
+})
+
 useHead({
-  title: 'Sistema de diseño — LUMIA',
-  meta: [{ name: 'robots', content: 'noindex' }],
+  title: 'Sistema de diseño — Admin LUMIA',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
 const typography = [
@@ -26,7 +31,7 @@ const shadows = [
 </script>
 
 <template>
-  <BaseContainer class="py-16 sm:py-24">
+  <BaseContainer class="py-4 sm:py-6">
     <header class="mb-14 border-b border-lumia-ink/8 pb-10">
       <p class="mb-3 text-xs uppercase tracking-[0.25em] text-lumia-gold">Referencia interna</p>
       <h1 class="font-display text-4xl font-medium text-lumia-ink sm:text-5xl">Sistema de diseño</h1>
@@ -36,7 +41,6 @@ const shadows = [
       </p>
     </header>
 
-    <!-- Paleta -->
     <section class="mb-16">
       <h2 class="mb-2 font-display text-2xl text-lumia-ink">Paleta <code class="text-base">lumia</code></h2>
       <p class="mb-6 text-sm text-lumia-ink/55">Clases Tailwind: <code>bg-lumia-*</code>, <code>text-lumia-*</code></p>
@@ -53,7 +57,6 @@ const shadows = [
       </div>
     </section>
 
-    <!-- Tipografía -->
     <section class="mb-16">
       <h2 class="mb-6 font-display text-2xl text-lumia-ink">Tipografía</h2>
       <div class="space-y-6">
@@ -73,7 +76,6 @@ const shadows = [
       </div>
     </section>
 
-    <!-- Botones -->
     <section class="mb-16">
       <h2 class="mb-6 font-display text-2xl text-lumia-ink">Botones</h2>
       <div class="flex flex-wrap gap-4 rounded-2xl border border-lumia-ink/6 bg-lumia-cream/40 p-8">
@@ -83,7 +85,6 @@ const shadows = [
       </div>
     </section>
 
-    <!-- Sombras y radios -->
     <section class="mb-16">
       <h2 class="mb-6 font-display text-2xl text-lumia-ink">Sombras y radios</h2>
       <div class="grid gap-6 sm:grid-cols-3">
@@ -102,7 +103,6 @@ const shadows = [
       </div>
     </section>
 
-    <!-- Tokens raw -->
     <section>
       <h2 class="mb-6 font-display text-2xl text-lumia-ink">Tokens (referencia)</h2>
       <div class="overflow-x-auto rounded-2xl border border-lumia-ink/6 bg-lumia-ink p-6 text-sm text-lumia-cream/90">

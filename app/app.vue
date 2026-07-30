@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { Toaster } from 'vue-sonner'
-import 'vue-sonner/style.css'
+const Toaster = defineAsyncComponent(async () => {
+  await import('vue-sonner/style.css')
+  const mod = await import('vue-sonner')
+  return mod.Toaster
+})
 </script>
 
 <template>
