@@ -1,7 +1,7 @@
 <template>
-  <section v-if="banners.length" class="border-b border-lumia-ink/6 bg-lumia-canvas py-6">
+  <section v-if="banners.length" class="border-b border-lumia-ink/6 bg-lumia-canvas py-4 sm:py-6">
     <BaseContainer>
-      <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
         <NuxtLink
           v-for="banner in banners"
           :key="banner.id"
@@ -11,7 +11,7 @@
           <NuxtImg
             :src="banner.imageUrl"
             :alt="banner.title ?? 'Promoción LUMIA'"
-            class="aspect-[21/9] w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+            class="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.02] sm:aspect-[21/9]"
             loading="lazy"
             sizes="(max-width: 768px) 100vw, 50vw"
           />

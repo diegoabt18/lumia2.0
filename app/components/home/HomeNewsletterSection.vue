@@ -1,9 +1,9 @@
 <template>
-  <section class="border-t border-lumia-ink/6 bg-lumia-cream/60 py-16 md:py-20">
+  <section class="border-t border-lumia-ink/6 bg-lumia-cream/60 py-10 md:py-20">
     <BaseContainer>
       <div class="mx-auto max-w-xl text-center">
         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-lumia-ink/45">Newsletter</p>
-        <h2 class="mt-4 font-display text-3xl text-lumia-ink">Lanzamientos y ritual mensual</h2>
+        <h2 class="mt-3 font-display text-2xl text-lumia-ink sm:mt-4 sm:text-3xl">Lanzamientos y ritual mensual</h2>
         <p class="mt-4 text-sm text-lumia-ink/60">
           Ediciones limitadas y notas de cuidado. Sin saturar tu bandeja.
         </p>

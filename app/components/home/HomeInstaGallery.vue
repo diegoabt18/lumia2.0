@@ -1,14 +1,14 @@
 <template>
-  <section class="bg-lumia-beige/25 py-12 md:py-16">
+  <section class="bg-lumia-beige/25 py-10 md:py-16">
     <BaseContainer>
-      <div class="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">@lumia.home</p>
-          <h2 class="mt-2 font-display text-2xl text-lumia-ink md:text-3xl">Momentos reales</h2>
+          <h2 class="mt-1.5 font-display text-xl text-lumia-ink sm:mt-2 sm:text-2xl md:text-3xl">Momentos reales</h2>
         </div>
-        <span class="text-sm text-lumia-ink/50">Inspiración y estilo de vida · comunidad</span>
+        <span class="text-xs text-lumia-ink/50 sm:text-sm">Inspiración y estilo de vida</span>
       </div>
-      <div class="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 lg:grid-cols-6">
+      <div class="mt-6 grid grid-cols-3 gap-1.5 sm:mt-8 sm:grid-cols-3 sm:gap-2 md:gap-3 lg:grid-cols-6">
         <div
           v-for="(src, i) in displaySlots"
           :key="src ? `${src}-${i}` : `placeholder-${i}`"

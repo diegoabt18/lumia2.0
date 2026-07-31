@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-lumia-canvas pb-24 pt-6 md:pt-10">
+  <div class="bg-lumia-canvas pb-28 pt-6 md:pb-24 md:pt-10 lg:pb-24">
     <BaseContainer>
       <AppBreadcrumbs :items="[{ label: 'Inicio', to: '/' }, { label: 'Carrito', to: '/cart' }, { label: 'Checkout' }]" />
 
@@ -13,8 +13,19 @@
         <BaseButton to="/products" class="mt-6">Ir al catálogo</BaseButton>
       </div>
 
-      <div v-else class="mx-auto mt-10 grid max-w-5xl gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <div class="rounded-2xl border border-lumia-ink/8 bg-white p-6 shadow-soft md:p-8">
+      <div v-else class="mx-auto mt-8 grid max-w-5xl gap-6 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10">
+        <CheckoutOrderSummary
+          class="order-1 lg:order-2"
+          :items="items"
+          :count="count"
+          :subtotal="total"
+          :shipping-cost="shippingQuote.shippingCost"
+          :grand-total="shippingQuote.grandTotal"
+          :shipping-variable="shippingQuote.variable"
+          :free-shipping="shippingQuote.freeShipping"
+        />
+
+        <div class="order-2 rounded-2xl border border-lumia-ink/8 bg-white p-5 shadow-soft sm:p-6 md:p-8 lg:order-1">
           <div class="mb-8 flex flex-col gap-4 rounded-2xl border border-lumia-ink/10 bg-lumia-cream/35 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">Identificación</p>
@@ -24,7 +35,7 @@
             <GoogleSignInButton v-if="!user" class="shrink-0 sm:min-w-[240px]" @click="loginWithGoogle('/checkout')" />
           </div>
 
-          <form @submit.prevent="onSubmit">
+          <form id="checkout-form" @submit.prevent="onSubmit">
             <h2 class="font-display text-xl text-lumia-ink">Datos de envío</h2>
             <p class="mt-1 text-sm text-lumia-ink/55">Los usaremos solo para este pedido.</p>
 
@@ -102,7 +113,7 @@
 
             <p v-if="submitError" class="mt-4 text-sm text-rose-600">{{ submitError }}</p>
 
-            <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="mt-8 hidden flex-col gap-3 lg:flex lg:flex-row lg:items-center">
               <BaseButton type="submit" class="sm:max-w-xs" :disabled="isSubmitting || !acceptTerms" block>
                 {{ isSubmitting ? 'Confirmando…' : 'Confirmar pedido' }}
               </BaseButton>
@@ -112,16 +123,31 @@
             </div>
           </form>
         </div>
+      </div>
 
-        <CheckoutOrderSummary
-          :items="items"
-          :count="count"
-          :subtotal="total"
-          :shipping-cost="shippingQuote.shippingCost"
-          :grand-total="shippingQuote.grandTotal"
-          :shipping-variable="shippingQuote.variable"
-          :free-shipping="shippingQuote.freeShipping"
-        />
+      <!-- Barra fija móvil: total + confirmar -->
+      <div
+        v-if="items.length"
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/8 bg-lumia-canvas/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_40px_-16px_rgba(15,15,15,0.15)] backdrop-blur-lg lg:hidden"
+      >
+        <div class="flex items-center gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-lumia-ink/45">
+              {{ count }} {{ count === 1 ? 'artículo' : 'artículos' }}
+            </p>
+            <p class="font-display text-xl font-semibold tabular-nums text-lumia-ink">
+              {{ formatPrice(shippingQuote.grandTotal) }}
+            </p>
+          </div>
+          <BaseButton
+            type="submit"
+            form="checkout-form"
+            class="min-h-[48px] shrink-0 px-5"
+            :disabled="isSubmitting || !acceptTerms"
+          >
+            {{ isSubmitting ? 'Confirmando…' : 'Confirmar pedido' }}
+          </BaseButton>
+        </div>
       </div>
     </BaseContainer>
   </div>
@@ -138,6 +164,7 @@ const { items, count, total, clearCart, syncToServer } = useCart()
 const { user, loginWithGoogle } = useAuth()
 const toast = useToast()
 const { quote } = useStoreShipping()
+const { formatPrice } = useUtils()
 
 const shippingQuote = computed(() => quote(total.value))
 

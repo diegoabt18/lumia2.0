@@ -1,13 +1,13 @@
 <template>
-  <section class="border-y border-lumia-ink/6 bg-lumia-cream/40 py-16 md:py-20">
+  <section class="border-y border-lumia-ink/6 bg-lumia-cream/40 py-10 md:py-20">
     <BaseContainer>
-      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid grid-cols-2 gap-6 sm:gap-10 lg:grid-cols-4">
         <div v-for="item in items" :key="item.title" class="text-center">
-          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-lumia-ink/8 bg-lumia-canvas shadow-soft">
-            <component :is="item.icon" class="h-6 w-6 stroke-[1.25] text-lumia-ink/70" />
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-lumia-ink/8 bg-lumia-canvas shadow-soft sm:h-14 sm:w-14">
+            <component :is="item.icon" class="h-5 w-5 stroke-[1.25] text-lumia-ink/70 sm:h-6 sm:w-6" />
           </div>
-          <h3 class="mt-5 font-display text-xl text-lumia-ink">{{ item.title }}</h3>
-          <p class="mt-2 text-sm leading-relaxed text-lumia-ink/60">{{ item.body }}</p>
+          <h3 class="mt-3 font-display text-base text-lumia-ink sm:mt-5 sm:text-xl">{{ item.title }}</h3>
+          <p class="mt-1.5 text-xs leading-relaxed text-lumia-ink/60 sm:mt-2 sm:text-sm">{{ item.body }}</p>
         </div>
       </div>
     </BaseContainer>

@@ -13,7 +13,7 @@
             @click.stop
           >
             <header
-              class="relative shrink-0 border-b border-lumia-ink/[0.06] bg-gradient-to-b from-lumia-cream/50 to-lumia-canvas px-4 pb-4 pt-5 backdrop-blur-xl sm:px-6"
+              class="relative shrink-0 border-b border-lumia-ink/[0.06] bg-gradient-to-b from-lumia-cream/50 to-lumia-canvas px-4 pb-3 pt-4 backdrop-blur-xl sm:px-6 sm:pb-4 sm:pt-5"
             >
               <div class="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-lumia-gold/60 to-transparent" />
               <div class="flex items-start justify-between gap-3">
@@ -21,7 +21,7 @@
                   <p class="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-lumia-gold/80">
                     Mini checkout
                   </p>
-                  <h2 class="mt-1 flex flex-wrap items-baseline gap-2 font-display text-2xl font-semibold text-lumia-ink">
+                  <h2 class="mt-0.5 flex flex-wrap items-baseline gap-2 font-display text-xl font-semibold text-lumia-ink sm:mt-1 sm:text-2xl">
                     Tu carrito
                     <span v-if="countLabel" class="text-lg font-medium text-lumia-ink/45">({{ countLabel }})</span>
                   </h2>
@@ -156,64 +156,90 @@
               </div>
 
               <footer
-                class="shrink-0 border-t border-lumia-ink/[0.07] bg-lumia-canvas/[0.97] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-12px_40px_-16px_rgba(43,43,43,0.12)] backdrop-blur-xl sm:px-6"
+                class="shrink-0 border-t border-lumia-ink/[0.07] bg-lumia-canvas/[0.97] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_40px_-16px_rgba(43,43,43,0.12)] backdrop-blur-xl sm:px-6 lg:pb-[max(1rem,env(safe-area-inset-bottom))] lg:pt-4"
               >
-                <CartShippingProgress
-                  v-if="freeShippingThreshold > 0"
-                  class="mb-4"
-                  :subtotal="lineTotal"
-                  :threshold="freeShippingThreshold"
-                  :remaining-label="freeShippingRemainingLabel"
-                />
+                <!-- Móvil: desglose colapsable para dejar espacio a los productos -->
+                <details class="group mb-3 lg:hidden">
+                  <summary
+                    class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-lumia-ink/[0.07] bg-white/70 px-3 py-2.5 text-sm [&::-webkit-details-marker]:hidden"
+                  >
+                    <span class="font-medium text-lumia-ink/70">Desglose y envío</span>
+                    <span class="flex items-center gap-2">
+                      <span class="font-display text-base font-semibold tabular-nums text-lumia-ink">
+                        {{ formatPrice(shippingQuote.grandTotal, currency) }}
+                      </span>
+                      <IconChevronDown class="h-4 w-4 text-lumia-ink/40 transition group-open:rotate-180" stroke-width="1.35" />
+                    </span>
+                  </summary>
+                  <div class="mt-3 space-y-3">
+                    <CartShippingProgress
+                      v-if="freeShippingThreshold > 0"
+                      :subtotal="lineTotal"
+                      :threshold="freeShippingThreshold"
+                      :remaining-label="freeShippingRemainingLabel"
+                    />
+                    <div class="rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50 to-amber-50/40 px-3 py-2.5">
+                      <div class="flex gap-2.5">
+                        <IconTruckDelivery class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" stroke-width="1.35" />
+                        <div>
+                          <p class="text-xs font-semibold text-amber-900">{{ CART_SHIPPING_WARNING_TITLE }}</p>
+                          <p class="mt-0.5 text-[11px] leading-relaxed text-amber-800/90">{{ CART_SHIPPING_WARNING_MESSAGE }}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <CartDrawerTotals
+                      :line-total="lineTotal"
+                      :shipping-quote="shippingQuote"
+                      :currency="currency"
+                      :shipping-row-label="shippingRowLabel"
+                    />
+                  </div>
+                </details>
 
-                <div class="rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50 to-amber-50/40 px-4 py-3">
-                  <div class="flex gap-3">
-                    <IconTruckDelivery class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" stroke-width="1.35" />
-                    <div>
-                      <p class="text-sm font-semibold text-amber-900">{{ CART_SHIPPING_WARNING_TITLE }}</p>
-                      <p class="mt-1 text-xs leading-relaxed text-amber-800/90">{{ CART_SHIPPING_WARNING_MESSAGE }}</p>
+                <!-- Desktop: desglose siempre visible -->
+                <div class="hidden lg:block">
+                  <CartShippingProgress
+                    v-if="freeShippingThreshold > 0"
+                    class="mb-4"
+                    :subtotal="lineTotal"
+                    :threshold="freeShippingThreshold"
+                    :remaining-label="freeShippingRemainingLabel"
+                  />
+
+                  <div class="rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50 to-amber-50/40 px-4 py-3">
+                    <div class="flex gap-3">
+                      <IconTruckDelivery class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" stroke-width="1.35" />
+                      <div>
+                        <p class="text-sm font-semibold text-amber-900">{{ CART_SHIPPING_WARNING_TITLE }}</p>
+                        <p class="mt-1 text-xs leading-relaxed text-amber-800/90">{{ CART_SHIPPING_WARNING_MESSAGE }}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="mt-4 space-y-2 text-sm">
-                  <div class="flex items-center justify-between text-lumia-ink/65">
-                    <span>Subtotal productos</span>
-                    <span class="tabular-nums">{{ formatPrice(lineTotal, currency) }}</span>
-                  </div>
-                  <div class="flex items-start justify-between gap-3 text-lumia-ink/65">
-                    <span>Envío</span>
-                    <span class="text-right">
-                      <span class="font-medium" :class="shippingQuote.variable ? 'text-amber-800' : 'text-lumia-ink'">{{ shippingRowLabel }}</span>
-                      <span v-if="shippingQuote.variable" class="mt-0.5 block text-[11px] text-lumia-ink/45">{{ CART_SHIPPING_ROW_HINT }}</span>
-                    </span>
-                  </div>
-                  <div class="flex items-center justify-between border-t border-lumia-ink/8 pt-3">
-                    <span class="font-medium text-lumia-ink">Total estimado</span>
-                    <span class="font-display text-xl font-semibold tabular-nums text-lumia-ink">
-                      {{ formatPrice(shippingQuote.grandTotal, currency) }}
-                    </span>
-                  </div>
-                  <p class="text-[11px] leading-relaxed text-lumia-ink/45">
-                    {{ shippingQuote.variable ? 'Sin incluir envío. El total final puede variar.' : 'Incluye envío según tarifa configurada.' }}
-                  </p>
-                </div>
+                  <CartDrawerTotals
+                    class="mt-4"
+                    :line-total="lineTotal"
+                    :shipping-quote="shippingQuote"
+                    :currency="currency"
+                    :shipping-row-label="shippingRowLabel"
+                  />
 
-                <ul class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-lumia-ink/45">
-                  <li class="flex items-center gap-1.5">
-                    <IconShieldCheck class="h-3.5 w-3.5 text-lumia-gold/80" stroke-width="1.35" />
-                    Pago seguro con el vendedor
-                  </li>
-                  <li class="flex items-center gap-1.5">
-                    <IconPackage class="h-3.5 w-3.5 text-lumia-gold/80" stroke-width="1.35" />
-                    Preparación artesanal
-                  </li>
-                </ul>
+                  <ul class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-lumia-ink/45">
+                    <li class="flex items-center gap-1.5">
+                      <IconShieldCheck class="h-3.5 w-3.5 text-lumia-gold/80" stroke-width="1.35" />
+                      Pago seguro con el vendedor
+                    </li>
+                    <li class="flex items-center gap-1.5">
+                      <IconPackage class="h-3.5 w-3.5 text-lumia-gold/80" stroke-width="1.35" />
+                      Preparación artesanal
+                    </li>
+                  </ul>
+                </div>
 
                 <BaseButton
                   to="/checkout"
                   block
-                  class="mt-5 min-h-[52px] gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] shadow-[0_14px_40px_-12px_rgba(15,15,15,0.4)]"
+                  class="min-h-[48px] gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] shadow-[0_14px_40px_-12px_rgba(15,15,15,0.4)] lg:mt-5 lg:min-h-[52px]"
                   @click="$emit('update:modelValue', false)"
                 >
                   <IconLock class="h-4 w-4 opacity-90" stroke-width="1.35" aria-hidden="true" />
@@ -222,7 +248,7 @@
 
                 <NuxtLink
                   to="/cart"
-                  class="mt-4 block py-2 text-center text-[13px] font-semibold text-lumia-ink/48 underline-offset-4 transition hover:text-lumia-ink hover:underline"
+                  class="mt-3 block py-1.5 text-center text-[13px] font-semibold text-lumia-ink/48 underline-offset-4 transition hover:text-lumia-ink hover:underline lg:mt-4 lg:py-2"
                   @click="$emit('update:modelValue', false)"
                 >
                   Ver carrito completo
@@ -238,6 +264,7 @@
 
 <script setup lang="ts">
 import {
+  IconChevronDown,
   IconLock,
   IconLoader2,
   IconMinus,

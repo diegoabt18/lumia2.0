@@ -1,6 +1,6 @@
 <template>
   <section
-    class="relative min-h-[72dvh] overflow-hidden bg-lumia-beige/50 md:min-h-[85vh]"
+    class="relative min-h-[62dvh] overflow-hidden bg-lumia-beige/50 sm:min-h-[72dvh] md:min-h-[85vh]"
     @mouseenter="stopAutoplay"
     @mouseleave="startAutoplay"
   >
@@ -39,35 +39,39 @@
 
     <div
       v-if="slides.length > 1"
-      class="absolute bottom-6 right-4 z-10 flex gap-2 md:bottom-8 md:right-8"
+      class="absolute bottom-5 right-3 z-10 flex gap-1 md:bottom-8 md:right-8 md:gap-2"
       aria-label="Diapositivas del hero"
     >
       <button
         v-for="(_, index) in slides"
         :key="`dot-${index}`"
         type="button"
-        class="h-2 rounded-full transition-all duration-500"
-        :class="index === activeIndex ? 'w-6 bg-white/95' : 'w-2 bg-white/45 hover:bg-white/70'"
+        class="flex h-11 w-11 items-center justify-center rounded-full"
         :aria-label="`Ir a imagen ${index + 1}`"
         :aria-current="index === activeIndex ? 'true' : undefined"
         @click="goTo(index)"
-      />
+      >
+        <span
+          class="block rounded-full transition-all duration-500"
+          :class="index === activeIndex ? 'h-2 w-6 bg-white/95' : 'h-2 w-2 bg-white/45'"
+        />
+      </button>
     </div>
 
-    <BaseContainer class="relative flex min-h-[72dvh] flex-col justify-end pb-16 pt-28 md:min-h-[85vh] md:pb-24 md:pt-32">
+    <BaseContainer class="relative flex min-h-[62dvh] flex-col justify-end pb-12 pt-24 sm:min-h-[72dvh] sm:pb-16 sm:pt-28 md:min-h-[85vh] md:pb-24 md:pt-32">
       <div class="max-w-2xl">
         <p class="text-xs font-semibold uppercase tracking-[0.35em] text-lumia-ink/50">Nueva temporada</p>
-        <h1 class="mt-4 font-display text-4xl font-medium leading-[1.1] text-lumia-ink sm:text-5xl md:text-6xl lg:text-7xl">
+        <h1 class="mt-3 font-display text-[1.75rem] font-medium leading-[1.12] text-lumia-ink sm:mt-4 sm:text-5xl md:text-6xl lg:text-7xl">
           Transforma momentos en experiencias
         </h1>
-        <p class="mt-6 max-w-md text-base leading-relaxed text-lumia-ink/70 md:text-lg">
+        <p class="mt-4 max-w-md text-sm leading-relaxed text-lumia-ink/70 sm:mt-6 sm:text-base md:text-lg">
           Velas artesanales, luz cálida y aromas que convierten tu hogar en un refugio.
         </p>
-        <div class="mt-10 flex flex-wrap gap-4">
-          <BaseButton type="button" variant="primary" @click="scrollToCollections">
+        <div class="mt-8 flex w-full flex-col gap-3 sm:mt-10 sm:w-auto sm:flex-row sm:flex-wrap sm:gap-4">
+          <BaseButton type="button" variant="primary" block class="sm:!w-auto" @click="scrollToCollections">
             Explorar colecciones
           </BaseButton>
-          <BaseButton to="/products" variant="secondary">Ver velas</BaseButton>
+          <BaseButton to="/products" variant="secondary" block class="sm:!w-auto">Ver velas</BaseButton>
         </div>
       </div>
     </BaseContainer>
