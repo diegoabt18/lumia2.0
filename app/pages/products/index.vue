@@ -35,11 +35,18 @@
           </button>
           <select
             v-model="sortBy"
-            class="min-h-[46px] max-w-[42%] shrink-0 rounded-2xl border border-lumia-ink/10 bg-lumia-canvas px-2 text-[11px] font-medium text-lumia-ink"
+            class="min-h-[46px] max-w-[34%] shrink-0 rounded-2xl border border-lumia-ink/10 bg-lumia-canvas px-2 text-[11px] font-medium text-lumia-ink"
             aria-label="Ordenar catálogo"
           >
             <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
+          <button
+            type="button"
+            class="inline-flex min-h-[46px] shrink-0 items-center justify-center rounded-2xl border border-lumia-ink/12 bg-lumia-ink px-3 text-[11px] font-semibold text-lumia-cream"
+            @click="applySearch"
+          >
+            Buscar
+          </button>
         </div>
         <div class="-mx-1 mt-2.5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
@@ -248,6 +255,21 @@ watch(
   { immediate: true }
 )
 
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(searchInput, (value) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    const trimmed = value.trim()
+    if (trimmed === searchApplied.value) return
+    replaceCatalogQuery({ search: trimmed || undefined, page: undefined })
+  }, 450)
+})
+
+onUnmounted(() => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+})
+
 type CatalogQueryPatch = Partial<{
   page: string | undefined
   limit: string | undefined
@@ -309,7 +331,7 @@ function emptyCatalogView(): CatalogView {
   }
 }
 
-/** Categoría y paginación simple → filtro local (sin round-trip al Worker). */
+/** Categoría → filtro local; búsqueda, promo u orden → servidor. */
 const needsServerCatalog = computed(
   () => promoOnly.value || Boolean(searchApplied.value) || sortBy.value !== '--'
 )
@@ -322,6 +344,38 @@ const {
 } = useAsyncData('catalog-snapshot', () => catalog.fetchProducts({ limit: 100, page: 1 }), {
   default: () => emptyCatalogView(),
 })
+
+const serverCatalog = ref<CatalogView>(emptyCatalogView())
+const serverPending = ref(false)
+const serverError = ref<unknown>(null)
+let serverFetchGeneration = 0
+
+async function fetchServerCatalog() {
+  if (!needsServerCatalog.value) return
+
+  const generation = ++serverFetchGeneration
+  serverPending.value = true
+  serverError.value = null
+
+  try {
+    const result = await catalogQuery()
+    if (generation !== serverFetchGeneration) return
+    serverCatalog.value = result
+  } catch (e) {
+    if (generation !== serverFetchGeneration) return
+    serverError.value = e
+  } finally {
+    if (generation === serverFetchGeneration) serverPending.value = false
+  }
+}
+
+watch(
+  [catalogFetchKey, needsServerCatalog],
+  ([, needServer]) => {
+    if (needServer) void fetchServerCatalog()
+  },
+  { immediate: true },
+)
 
 const clientCatalog = computed((): CatalogView | null => {
   if (needsServerCatalog.value) return null
@@ -357,31 +411,11 @@ function catalogQuery() {
   })
 }
 
-const {
-  data: serverCatalog,
-  pending: serverPending,
-  error: serverError,
-  refresh: refreshServer,
-} = useAsyncData('catalog-list', () => catalogQuery(), {
-  watch: [catalogFetchKey],
-  lazy: true,
-  immediate: false,
-  default: () => emptyCatalogView(),
-})
-
-watch(
-  needsServerCatalog,
-  (need) => {
-    if (need) void refreshServer()
-  },
-  { immediate: true }
-)
-
 const activeCatalog = computed(() => {
   if (!needsServerCatalog.value) {
     return clientCatalog.value ?? emptyCatalogView()
   }
-  return serverCatalog.value ?? emptyCatalogView()
+  return serverCatalog.value
 })
 
 const pending = computed(() => (needsServerCatalog.value ? serverPending.value : snapshotPending.value))
@@ -391,7 +425,7 @@ const displayProducts = computed(() => activeCatalog.value.products)
 const pagination = computed(() => activeCatalog.value.pagination)
 
 function refresh() {
-  if (needsServerCatalog.value) return refreshServer()
+  if (needsServerCatalog.value) return fetchServerCatalog()
   return refreshSnapshot()
 }
 
