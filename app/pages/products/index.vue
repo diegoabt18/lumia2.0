@@ -22,7 +22,6 @@
               autocomplete="off"
               placeholder="Buscar en LUMIA…"
               class="min-h-[46px] w-full rounded-2xl border border-lumia-ink/10 bg-lumia-cream/45 pl-10 pr-3 text-sm text-lumia-ink placeholder:text-lumia-ink/35 focus:border-lumia-gold/45 focus:outline-none focus:ring-2 focus:ring-lumia-gold/20"
-              @keydown.enter.prevent="applySearch"
             />
           </div>
           <button
@@ -84,7 +83,6 @@
               autocomplete="off"
               placeholder="Buscar producto…"
               class="min-h-[2.75rem] w-full min-w-0 flex-1 rounded-xl border border-lumia-ink/10 bg-lumia-canvas px-4 text-sm text-lumia-ink placeholder:text-lumia-ink/35 focus:border-lumia-gold/45 focus:outline-none sm:max-w-md"
-              @keydown.enter.prevent="applySearch"
             />
             <select
               v-model="sortBy"
@@ -93,6 +91,9 @@
               <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
             <BaseButton type="button" @click="applySearch">Buscar</BaseButton>
+            <p class="w-full text-xs text-lumia-ink/45 sm:order-last sm:basis-full">
+              Busca por nombre, marca o descripción del producto. Pulsa «Buscar» para aplicar.
+            </p>
             <BaseButton v-if="searchApplied || hasActiveFilters" type="button" variant="ghost" @click="clearFilters">
               Limpiar
             </BaseButton>
@@ -254,21 +255,6 @@ watch(
   },
   { immediate: true }
 )
-
-let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-watch(searchInput, (value) => {
-  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
-  searchDebounceTimer = setTimeout(() => {
-    const trimmed = value.trim()
-    if (trimmed === searchApplied.value) return
-    replaceCatalogQuery({ search: trimmed || undefined, page: undefined })
-  }, 450)
-})
-
-onUnmounted(() => {
-  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
-})
 
 type CatalogQueryPatch = Partial<{
   page: string | undefined
