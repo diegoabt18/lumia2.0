@@ -100,7 +100,7 @@ async function saveProfile() {
         nickname: profileForm.nickname.trim() || undefined,
       },
     })
-    await fetchUser()
+    await fetchUser({ force: true })
     toast.success('Perfil actualizado')
   } catch {
     toast.error('No se pudo guardar el perfil')
