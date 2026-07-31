@@ -27,7 +27,6 @@ onMounted(() => {
       // Invitado sin cookie: mantener ítems locales y seguir usando la API en mutaciones/checkout.
       cartStore.$patch({ apiEnabled: true })
     }
-    void useWishlist().load()
   })
 })
 </script>

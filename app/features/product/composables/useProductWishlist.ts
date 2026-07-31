@@ -1,3 +1,5 @@
+import { createSharedComposable } from '@vueuse/core'
+
 const STORAGE_KEY = 'lumia_wishlist_v1'
 export const WISHLIST_MAX = 30
 
@@ -22,39 +24,27 @@ function clearLocalSlugs() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
-export function useWishlist() {
+function httpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  const status = (error as { statusCode?: number; status?: number }).statusCode
+    ?? (error as { status?: number }).status
+  return typeof status === 'number' ? status : undefined
+}
+
+function applySlugs(current: string[], next: string[]): string[] {
+  const prevKey = current.join('\0')
+  const nextKey = next.join('\0')
+  if (nextKey === prevKey) return current
+  return next
+}
+
+const useWishlistShared = createSharedComposable(() => {
   const auth = useAuth()
   const slugs = useState<string[]>('wishlist-slugs', () => [])
   const loaded = useState('wishlist-loaded', () => false)
   const pending = ref(false)
 
   let loadPromise: Promise<void> | null = null
-
-  async function load() {
-    if (loadPromise) return loadPromise
-    loadPromise = (async () => {
-      try {
-        if (auth.user.value) {
-          const res = await $fetch<{ slugs: string[] }>('/api/account/favorites', { timeout: 4_000 })
-          const next = res.slugs ?? []
-          const prevKey = slugs.value.join('\0')
-          const nextKey = next.join('\0')
-          if (nextKey !== prevKey) slugs.value = next
-        } else {
-          const next = readLocalSlugs()
-          const prevKey = slugs.value.join('\0')
-          const nextKey = next.join('\0')
-          if (nextKey !== prevKey) slugs.value = next
-        }
-      } catch {
-        slugs.value = auth.user.value ? [] : readLocalSlugs()
-      } finally {
-        loaded.value = true
-        loadPromise = null
-      }
-    })()
-    return loadPromise
-  }
 
   async function syncLocalToServer() {
     if (!auth.user.value || !import.meta.client) return
@@ -65,24 +55,65 @@ export function useWishlist() {
         method: 'POST',
         body: { slugs: local },
       })
-      slugs.value = res.slugs ?? []
+      slugs.value = applySlugs(slugs.value, res.slugs ?? [])
       clearLocalSlugs()
-    } catch {
-      await load()
+    } catch (e) {
+      if (httpStatus(e) === 401) await auth.fetchUser()
     }
+  }
+
+  async function load(options: { force?: boolean } = {}) {
+    if (loadPromise) return loadPromise
+    if (loaded.value && !options.force) return loadPromise
+
+    loadPromise = (async () => {
+      pending.value = true
+      try {
+        if (auth.user.value) {
+          const res = await $fetch<{ slugs: string[] }>('/api/account/favorites', { timeout: 4_000 })
+          slugs.value = applySlugs(slugs.value, res.slugs ?? [])
+        } else {
+          slugs.value = applySlugs(slugs.value, readLocalSlugs())
+        }
+      } catch (e) {
+        if (httpStatus(e) === 401) {
+          await auth.fetchUser()
+          if (!auth.user.value) {
+            slugs.value = applySlugs(slugs.value, readLocalSlugs())
+          }
+        } else if (!auth.user.value) {
+          slugs.value = applySlugs(slugs.value, readLocalSlugs())
+        }
+      } finally {
+        loaded.value = true
+        pending.value = false
+        loadPromise = null
+      }
+    })()
+
+    return loadPromise
   }
 
   if (import.meta.client) {
     watch(
       () => auth.user.value?.id,
       (id, prev) => {
+        loaded.value = false
         if (id && id !== prev) {
-          void syncLocalToServer().then(() => load())
+          void syncLocalToServer().then(() => load({ force: true }))
         } else if (!id) {
-          slugs.value = readLocalSlugs()
+          slugs.value = applySlugs(slugs.value, readLocalSlugs())
           loaded.value = true
         }
-      }
+      },
+    )
+
+    watch(
+      () => auth.loaded.value,
+      (ready) => {
+        if (ready && !loaded.value) void load()
+      },
+      { immediate: true },
     )
   }
 
@@ -125,6 +156,9 @@ export function useWishlist() {
       writeLocalSlugs(list)
       slugs.value = list
       return favorited
+    } catch (e) {
+      if (httpStatus(e) === 401) await auth.fetchUser()
+      return null
     } finally {
       pending.value = false
     }
@@ -138,22 +172,14 @@ export function useWishlist() {
     toggle,
     isFavorited,
   }
-}
+})
+
+export const useWishlist = useWishlistShared
 
 export function useProductWishlist(productSlug: MaybeRefOrGetter<string>) {
-  const { isFavorited, toggle, load, loaded, pending } = useWishlist()
+  const { isFavorited, toggle, pending } = useWishlist()
   const slug = computed(() => toValue(productSlug))
-
   const favorited = computed(() => isFavorited(slug.value))
-
-  if (import.meta.client && !loaded.value) {
-    onMounted(() => void load())
-  }
-
-  watch(slug, () => {
-    if (loaded.value) return
-    void load()
-  })
 
   async function toggleWishlist() {
     return toggle(slug.value)

@@ -28,7 +28,7 @@ import type { Product } from '#shared/types/product'
 
 const auth = useAuth()
 const catalog = useCatalog()
-const { slugs, load, loaded } = useWishlist()
+const { slugs, loaded } = useWishlist()
 
 const loadingProducts = ref(false)
 const products = ref<Product[]>([])
@@ -61,25 +61,24 @@ async function fetchProductsForSlugs(slugList: readonly string[]) {
 }
 
 watch(
-  [() => auth.user.value?.id, () => auth.loaded.value, slugs, loaded],
-  async ([userId, authLoaded, slugList, wishlistLoaded]) => {
-    if (!authLoaded) return
-
-    if (!userId) {
-      products.value = []
-      lastFetchedSlugsKey = ''
-      return
-    }
-
-    if (!wishlistLoaded) {
-      await load()
-      return
-    }
-
-    await fetchProductsForSlugs(slugList)
+  () => auth.user.value?.id,
+  (userId) => {
+    lastFetchedSlugsKey = ''
+    products.value = []
+    if (!userId) return
+    if (loaded.value) void fetchProductsForSlugs(slugs.value)
   },
-  { immediate: true }
+  { immediate: true },
 )
+
+watch(slugs, (slugList) => {
+  if (!auth.user.value || !loaded.value) return
+  void fetchProductsForSlugs(slugList)
+})
+
+watch(loaded, (isLoaded) => {
+  if (isLoaded && auth.user.value) void fetchProductsForSlugs(slugs.value)
+})
 
 useHead({ title: 'Favoritos — LUMIA' })
 </script>
