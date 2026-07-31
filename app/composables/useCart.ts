@@ -17,6 +17,7 @@ export function useCart() {
     isAdding: store.isAdding,
     isQtyUpdating: store.isQtyUpdating,
     fetchCart: store.fetchCart,
+    syncToServer: store.syncToServer,
     clearCart: store.clearCart,
   }
 }

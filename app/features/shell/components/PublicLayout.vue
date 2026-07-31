@@ -24,7 +24,8 @@ onMounted(() => {
     if (payload.source === 'api' || payload.source === 'mongo') {
       cartStore.$patch({ items: payload.items ?? [], apiEnabled: true })
     } else if (payload.source === 'local') {
-      cartStore.$patch({ apiEnabled: false })
+      // Invitado sin cookie: mantener ítems locales y seguir usando la API en mutaciones/checkout.
+      cartStore.$patch({ apiEnabled: true })
     }
     void useWishlist().load()
   })

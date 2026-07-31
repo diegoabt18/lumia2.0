@@ -134,7 +134,7 @@ import SecurityTurnstileWidget from '~/components/security/TurnstileWidget.vue'
 const config = useRuntimeConfig()
 const turnstileSiteKey = computed(() => String(config.public.turnstileSiteKey || '').trim())
 
-const { items, count, total, clearCart } = useCart()
+const { items, count, total, clearCart, syncToServer } = useCart()
 const { user, loginWithGoogle } = useAuth()
 const toast = useToast()
 const { quote } = useStoreShipping()
@@ -210,6 +210,15 @@ async function onSubmit() {
 
   isSubmitting.value = true
   try {
+    if (!user.value) {
+      const synced = await syncToServer()
+      if (!synced) {
+        submitError.value = 'No se pudo sincronizar tu carrito. Revisa tu conexión e inténtalo de nuevo.'
+        toast.error(submitError.value)
+        return
+      }
+    }
+
     const result = await $fetch<{
       orderNumber: string
       total: number
@@ -232,12 +241,13 @@ async function onSubmit() {
   } catch (e: unknown) {
     const err = e as {
       statusCode?: number
-      data?: { message?: string }
+      data?: { message?: string; statusMessage?: string }
       message?: string
       statusMessage?: string
     }
     submitError.value =
       err?.data?.message ||
+      err?.data?.statusMessage ||
       err?.message ||
       err?.statusMessage ||
       'No se pudo crear el pedido'

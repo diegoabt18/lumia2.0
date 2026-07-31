@@ -67,7 +67,8 @@ export const useCartStore = defineStore('cart', () => {
       try {
         const res = await $fetch<{ items: CartItem[]; source?: string }>('/api/cart')
         if (res.source === 'local') {
-          apiEnabled.value = false
+          // Invitado sin cookie aún: carrito vacío en servidor, pero la API sigue disponible.
+          apiEnabled.value = true
           return
         }
         apiEnabled.value = true
@@ -79,6 +80,44 @@ export const useCartStore = defineStore('cart', () => {
       }
     })()
     return fetchPromise
+  }
+
+  /** Sincroniza líneas locales al carrito del servidor (requerido antes del checkout invitado). */
+  async function syncToServer(): Promise<boolean> {
+    if (!items.value.length) return false
+
+    try {
+      const current = await $fetch<{ items: CartItem[]; source?: string }>('/api/cart')
+      if (current.source !== 'local' && (current.items?.length ?? 0) > 0) {
+        apiEnabled.value = true
+        items.value = current.items ?? []
+        return true
+      }
+
+      for (const item of items.value) {
+        await $fetch<{ items: CartItem[] }>('/api/cart/items', {
+          method: 'POST',
+          body: {
+            sku: item.sku,
+            quantity: item.quantity,
+            product: {
+              productSlug: item.productSlug,
+              productName: item.productName,
+              variantLabel: item.variantLabel,
+              currency: item.currency,
+              imagePath: item.imagePath ?? null,
+            },
+          },
+        })
+      }
+
+      const res = await $fetch<{ items: CartItem[]; source?: string }>('/api/cart')
+      apiEnabled.value = true
+      if (res.items?.length) items.value = res.items
+      return true
+    } catch {
+      return false
+    }
   }
 
   async function addItem(payload: {
@@ -228,6 +267,7 @@ export const useCartStore = defineStore('cart', () => {
     removeItem,
     updateQuantity,
     fetchCart,
+    syncToServer,
     clearCart,
   }
 })
