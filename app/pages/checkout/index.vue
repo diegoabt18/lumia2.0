@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-lumia-canvas pb-32 pt-4 sm:pb-28 sm:pt-6 md:pt-10 lg:pb-24">
+  <div class="overflow-x-hidden bg-lumia-canvas pb-32 pt-3 sm:pb-28 sm:pt-4 md:pt-10 lg:pb-24">
     <BaseContainer>
       <AppBreadcrumbs
         class="hidden sm:block"
@@ -10,10 +10,10 @@
         <p class="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-lumia-gold/80 lg:hidden">
           Checkout
         </p>
-        <h1 class="mt-1 font-display text-2xl font-medium text-lumia-ink sm:mt-0 sm:text-4xl md:text-5xl">
+        <h1 class="mt-1 font-display text-xl font-medium text-lumia-ink sm:mt-0 sm:text-2xl md:text-4xl lg:text-5xl">
           Finalizar pedido
         </h1>
-        <p class="mt-2 text-sm text-lumia-ink/60 sm:mt-4 sm:max-w-2xl sm:text-base">
+        <p class="mt-1.5 text-xs text-lumia-ink/60 sm:mt-4 sm:max-w-2xl sm:text-sm md:text-base">
           <span class="lg:hidden">Revisa tu pedido y completa el envío.</span>
           <span class="hidden lg:inline">
             Completa tus datos de envío. El pago se coordina directamente con el vendedor (transferencia, efectivo, etc.).
@@ -49,8 +49,8 @@
           :free-shipping="shippingQuote.freeShipping"
         />
 
-        <div class="mt-4 rounded-2xl border border-lumia-ink/8 bg-white p-4 shadow-soft sm:mt-6 sm:p-6 md:p-8 lg:order-1 lg:mt-0">
-          <div class="mb-5 flex flex-col gap-3 rounded-xl border border-lumia-ink/10 bg-lumia-cream/35 p-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:rounded-2xl sm:p-6">
+        <div class="mt-3 rounded-xl border border-lumia-ink/8 bg-white p-3 shadow-soft sm:mt-6 sm:rounded-2xl sm:p-4 md:p-6 lg:order-1 lg:mt-0 lg:p-8">
+          <div class="mb-4 flex flex-col gap-3 rounded-lg border border-lumia-ink/10 bg-lumia-cream/35 p-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:rounded-2xl sm:p-6">
             <div>
               <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">Identificación</p>
               <p v-if="user" class="mt-1.5 text-sm text-lumia-ink/65 sm:mt-2">
@@ -60,23 +60,23 @@
                 Entra con Google o compra como invitado.
               </p>
             </div>
-            <GoogleSignInButton v-if="!user" class="w-full shrink-0 sm:w-auto sm:min-w-[240px]" @click="loginWithGoogle('/checkout')" />
+            <GoogleSignInButton v-if="!user" block class="w-full shrink-0 sm:min-w-[240px]" @click="loginWithGoogle('/checkout')" />
           </div>
 
           <form id="checkout-form" @submit.prevent="onSubmit">
-            <h2 class="font-display text-lg text-lumia-ink sm:text-xl">Datos de envío</h2>
+            <h2 class="font-display text-base text-lumia-ink sm:text-lg md:text-xl">Datos de envío</h2>
             <p class="mt-1 text-sm text-lumia-ink/55">Los usaremos solo para este pedido.</p>
 
             <div class="mt-5 grid gap-4 sm:mt-6 sm:gap-5 sm:grid-cols-2">
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="customerName">Nombre completo</label>
-                <input id="customerName" v-model="form.customerName" type="text" autocomplete="name" class="lumia-field-input min-h-12" :class="fieldError('customerName') && 'border-rose-400'" />
+                <input id="customerName" v-model="form.customerName" type="text" autocomplete="name" class="lumia-field-input lumia-field-input--compact min-h-11 sm:min-h-12" :class="fieldError('customerName') && 'border-rose-400'" />
                 <p v-if="fieldError('customerName')" class="mt-1 text-xs text-rose-600">{{ fieldError('customerName') }}</p>
               </div>
 
               <div v-if="!user" class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="email">Email</label>
-                <input id="email" v-model="form.email" type="email" autocomplete="email" inputmode="email" placeholder="tu@email.com" class="lumia-field-input min-h-12" :class="fieldError('email') && 'border-rose-400'" />
+                <input id="email" v-model="form.email" type="email" autocomplete="email" inputmode="email" placeholder="tu@email.com" class="lumia-field-input lumia-field-input--compact min-h-11 sm:min-h-12" :class="fieldError('email') && 'border-rose-400'" />
                 <p v-if="fieldError('email')" class="mt-1 text-xs text-rose-600">{{ fieldError('email') }}</p>
                 <p v-else class="mt-1 text-xs text-lumia-ink/50">Te enviaremos la confirmación del pedido.</p>
               </div>
@@ -86,31 +86,31 @@
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="phone">Teléfono / WhatsApp</label>
-                <input id="phone" v-model="form.phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Ej. +57 300 1234567" class="lumia-field-input min-h-12" :class="fieldError('phone') && 'border-rose-400'" />
+                <input id="phone" v-model="form.phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Ej. +57 300 1234567" class="lumia-field-input lumia-field-input--compact min-h-11 sm:min-h-12" :class="fieldError('phone') && 'border-rose-400'" />
                 <p v-if="fieldError('phone')" class="mt-1 text-xs text-rose-600">{{ fieldError('phone') }}</p>
               </div>
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="address">Dirección</label>
-                <input id="address" v-model="form.address" type="text" autocomplete="street-address" class="lumia-field-input min-h-12" :class="fieldError('address') && 'border-rose-400'" />
+                <input id="address" v-model="form.address" type="text" autocomplete="street-address" class="lumia-field-input lumia-field-input--compact min-h-11 sm:min-h-12" :class="fieldError('address') && 'border-rose-400'" />
                 <p v-if="fieldError('address')" class="mt-1 text-xs text-rose-600">{{ fieldError('address') }}</p>
               </div>
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="city">Ciudad</label>
-                <input id="city" v-model="form.city" type="text" autocomplete="address-level2" class="lumia-field-input min-h-12" :class="fieldError('city') && 'border-rose-400'" />
+                <input id="city" v-model="form.city" type="text" autocomplete="address-level2" class="lumia-field-input lumia-field-input--compact min-h-11 sm:min-h-12" :class="fieldError('city') && 'border-rose-400'" />
                 <p v-if="fieldError('city')" class="mt-1 text-xs text-rose-600">{{ fieldError('city') }}</p>
               </div>
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="reference">Referencia</label>
-                <input id="reference" v-model="form.reference" type="text" placeholder="Torre, apto, barrio…" class="lumia-field-input min-h-12" :class="fieldError('reference') && 'border-rose-400'" />
+                <input id="reference" v-model="form.reference" type="text" placeholder="Torre, apto, barrio…" class="lumia-field-input lumia-field-input--compact min-h-11 sm:min-h-12" :class="fieldError('reference') && 'border-rose-400'" />
                 <p v-if="fieldError('reference')" class="mt-1 text-xs text-rose-600">{{ fieldError('reference') }}</p>
               </div>
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="notes">Notas (opcional)</label>
-                <textarea id="notes" v-model="form.notes" rows="3" class="lumia-field-input min-h-[5.5rem] resize-y" />
+                <textarea id="notes" v-model="form.notes" rows="3" class="lumia-field-input lumia-field-input--compact min-h-[5rem] resize-y sm:min-h-[5.5rem]" />
               </div>
             </div>
 
@@ -161,31 +161,33 @@
       <!-- Barra fija móvil -->
       <div
         v-if="items.length"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/8 bg-lumia-canvas/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_40px_-16px_rgba(15,15,15,0.15)] backdrop-blur-lg lg:hidden"
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/8 bg-lumia-canvas/95 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_40px_-16px_rgba(15,15,15,0.15)] backdrop-blur-lg sm:px-3 sm:pt-2.5 lg:hidden"
       >
-        <p v-if="!acceptTerms" class="mb-2 text-center text-[11px] text-lumia-ink/50">
+        <p v-if="!acceptTerms" class="mb-1.5 truncate text-center text-[10px] text-lumia-ink/50 sm:mb-2 sm:text-[11px]">
           Acepta los términos para confirmar
         </p>
-        <div class="flex items-stretch gap-2">
+        <div class="grid grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-1.5 sm:flex sm:items-stretch sm:gap-2">
           <button
             type="button"
-            class="flex min-h-[48px] min-w-[4.5rem] flex-col items-center justify-center rounded-xl border border-lumia-ink/12 bg-white px-2 text-lumia-ink/70"
+            class="flex h-11 w-11 flex-col items-center justify-center rounded-lg border border-lumia-ink/12 bg-white text-lumia-ink/70 sm:min-h-[48px] sm:min-w-[4.5rem] sm:rounded-xl"
             aria-label="Ver pedido"
             @click="openMobileOrderSheet"
           >
             <IconShoppingBag class="h-4 w-4" stroke-width="1.35" />
-            <span class="mt-0.5 text-[10px] font-semibold">{{ count }}</span>
+            <span class="mt-0.5 text-[9px] font-semibold sm:text-[10px]">{{ count }}</span>
           </button>
-          <div class="flex min-w-0 flex-1 flex-col justify-center px-1">
-            <p class="text-[10px] font-medium uppercase tracking-wide text-lumia-ink/45">Total estimado</p>
-            <p class="font-display text-lg font-semibold tabular-nums leading-tight text-lumia-ink">
+          <div class="min-w-0 sm:flex sm:flex-1 sm:flex-col sm:justify-center sm:px-1">
+            <p class="truncate text-[9px] font-medium uppercase tracking-wide text-lumia-ink/45 sm:text-[10px]">
+              Total estimado
+            </p>
+            <p class="truncate font-display text-base font-semibold tabular-nums leading-tight text-lumia-ink sm:text-lg">
               {{ formatPrice(shippingQuote.grandTotal) }}
             </p>
           </div>
           <BaseButton
             type="submit"
             form="checkout-form"
-            class="min-h-[48px] shrink-0 px-4 text-sm"
+            class="min-h-11 shrink-0 px-2.5 text-xs sm:min-h-[48px] sm:px-4 sm:text-sm"
             :disabled="isSubmitting || !acceptTerms"
           >
             {{ isSubmitting ? '…' : 'Confirmar' }}

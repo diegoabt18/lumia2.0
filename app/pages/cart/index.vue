@@ -200,17 +200,17 @@
       <!-- CTA fijo en móvil -->
       <div
         v-if="items.length"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/8 bg-lumia-canvas/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_40px_-16px_rgba(15,15,15,0.15)] backdrop-blur-lg lg:hidden"
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/8 bg-lumia-canvas/95 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_40px_-16px_rgba(15,15,15,0.15)] backdrop-blur-lg sm:px-4 sm:pt-3 lg:hidden"
       >
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-[11px] font-medium uppercase tracking-wide text-lumia-ink/45">Total estimado</p>
-            <p class="font-display text-xl font-semibold tabular-nums text-lumia-ink">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-[9px] font-medium uppercase tracking-wide text-lumia-ink/45 sm:text-[11px]">Total estimado</p>
+            <p class="truncate font-display text-base font-semibold tabular-nums text-lumia-ink sm:text-xl">
               {{ formatPrice(shippingQuote.grandTotal, currency) }}
             </p>
           </div>
-          <BaseButton to="/checkout" class="min-h-[48px] shrink-0 px-6">
-            Ir al checkout
+          <BaseButton to="/checkout" class="min-h-11 shrink-0 px-3 text-xs sm:min-h-[48px] sm:px-6 sm:text-sm">
+            Checkout
           </BaseButton>
         </div>
       </div>

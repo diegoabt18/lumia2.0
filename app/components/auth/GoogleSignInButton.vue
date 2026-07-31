@@ -110,4 +110,18 @@ defineEmits<{ click: [event: MouseEvent] }>()
 .google-sign-in-btn__label {
   white-space: nowrap;
 }
+
+@media (max-width: 360px) {
+  .google-sign-in-btn {
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .google-sign-in-btn__label {
+    white-space: normal;
+    line-height: 1.2;
+    text-align: center;
+  }
+}
 </style>

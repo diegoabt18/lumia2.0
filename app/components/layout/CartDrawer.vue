@@ -25,8 +25,8 @@
                     Tu carrito
                     <span v-if="countLabel" class="text-lg font-medium text-lumia-ink/45">({{ countLabel }})</span>
                   </h2>
-                  <p v-if="lineItems.length" class="mt-1 text-xs text-lumia-ink/50">
-                    {{ lineItems.length }} {{ lineItems.length === 1 ? 'producto' : 'productos' }} · Pago acordado con el vendedor
+                  <p v-if="lineItems.length" class="mt-1 line-clamp-2 text-[11px] leading-snug text-lumia-ink/50 sm:text-xs">
+                    {{ lineItems.length }} {{ lineItems.length === 1 ? 'producto' : 'productos' }} · Pago con el vendedor
                   </p>
                 </div>
                 <button
@@ -61,10 +61,10 @@
                     :key="item.sku"
                     class="group relative overflow-hidden rounded-2xl border border-lumia-ink/[0.06] bg-white shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]"
                   >
-                    <div class="flex gap-3 p-3 sm:gap-4 sm:p-3.5">
+                    <div class="flex gap-2.5 p-2.5 sm:gap-3 sm:p-3 md:gap-4 md:p-3.5">
                       <NuxtLink
                         :to="`/products/${item.productSlug}`"
-                        class="relative h-[92px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-lumia-beige/40 ring-1 ring-lumia-ink/[0.05]"
+                        class="relative h-[4.5rem] w-[3.75rem] shrink-0 overflow-hidden rounded-lg bg-lumia-beige/40 ring-1 ring-lumia-ink/[0.05] sm:h-[5.75rem] sm:w-[4.5rem] sm:rounded-xl"
                         @click="$emit('update:modelValue', false)"
                       >
                         <ProductShopImage
@@ -81,7 +81,7 @@
                           <div class="min-w-0">
                             <NuxtLink
                               :to="`/products/${item.productSlug}`"
-                              class="line-clamp-2 font-display text-[15px] font-semibold leading-snug text-lumia-ink transition hover:text-lumia-gold"
+                              class="line-clamp-2 font-display text-[13px] font-semibold leading-snug text-lumia-ink transition hover:text-lumia-gold sm:text-[15px]"
                               @click="$emit('update:modelValue', false)"
                             >
                               {{ item.productName }}
@@ -100,11 +100,11 @@
                           </button>
                         </div>
 
-                        <div class="mt-auto flex flex-wrap items-end justify-between gap-3 pt-3">
-                          <div class="flex items-center gap-0.5 rounded-full border border-lumia-ink/[0.08] bg-lumia-cream/40 p-0.5">
+                        <div class="mt-auto flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-3 sm:pt-3">
+                          <div class="flex w-fit max-w-full items-center gap-0.5 rounded-full border border-lumia-ink/[0.08] bg-lumia-cream/40 p-0.5">
                             <button
                               type="button"
-                              class="flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35"
+                              class="flex h-10 w-10 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35 sm:h-11 sm:w-11"
                               aria-label="Reducir cantidad"
                               :disabled="item.quantity <= 1 || isQtyUpdating(item.sku)"
                               @click="updateQty(item.sku, item.quantity - 1)"
@@ -121,7 +121,7 @@
                             </span>
                             <button
                               type="button"
-                              class="flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35"
+                              class="flex h-10 w-10 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35 sm:h-11 sm:w-11"
                               aria-label="Aumentar cantidad"
                               :disabled="isQtyUpdating(item.sku)"
                               @click="updateQty(item.sku, item.quantity + 1)"
@@ -130,18 +130,18 @@
                             </button>
                           </div>
 
-                          <div class="text-right">
+                          <div class="flex items-end justify-between gap-2 sm:block sm:text-right">
                             <p
                               v-if="item.originalUnitPrice && item.originalUnitPrice > item.unitPrice"
                               class="text-[10px] font-medium text-lumia-ink/35 line-through"
                             >
                               {{ formatPrice(item.originalUnitPrice, item.currency) }}
                             </p>
-                            <p class="text-[11px] font-medium uppercase tracking-wide text-lumia-ink/38">
+                            <p class="text-[10px] font-medium uppercase tracking-wide text-lumia-ink/38 sm:text-[11px]">
                               {{ formatPrice(item.unitPrice, item.currency) }} c/u
                               <span v-if="item.promotionPercentOff" class="ml-1 text-lumia-gold">−{{ item.promotionPercentOff }}%</span>
                             </p>
-                            <p class="font-display text-[17px] font-semibold tabular-nums text-lumia-ink">
+                            <p class="font-display text-base font-semibold tabular-nums text-lumia-ink sm:text-[17px]">
                               {{ formatPrice(item.unitPrice * item.quantity, item.currency) }}
                             </p>
                           </div>
@@ -161,11 +161,11 @@
                 <!-- Móvil: desglose colapsable para dejar espacio a los productos -->
                 <details class="group mb-3 lg:hidden">
                   <summary
-                    class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-lumia-ink/[0.07] bg-white/70 px-3 py-2.5 text-sm [&::-webkit-details-marker]:hidden"
+                    class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-xl border border-lumia-ink/[0.07] bg-white/70 px-2.5 py-2 text-sm sm:gap-3 sm:px-3 sm:py-2.5 [&::-webkit-details-marker]:hidden"
                   >
-                    <span class="font-medium text-lumia-ink/70">Desglose y envío</span>
-                    <span class="flex items-center gap-2">
-                      <span class="font-display text-base font-semibold tabular-nums text-lumia-ink">
+                    <span class="shrink-0 font-medium text-lumia-ink/70">Desglose y envío</span>
+                    <span class="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                      <span class="truncate font-display text-sm font-semibold tabular-nums text-lumia-ink sm:text-base">
                         {{ formatPrice(shippingQuote.grandTotal, currency) }}
                       </span>
                       <IconChevronDown class="h-4 w-4 text-lumia-ink/40 transition group-open:rotate-180" stroke-width="1.35" />
