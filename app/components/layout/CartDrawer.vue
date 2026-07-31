@@ -92,7 +92,7 @@
                           </div>
                           <button
                             type="button"
-                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lumia-ink/35 transition hover:bg-lumia-ink/[0.05] hover:text-rose-600 active:scale-[0.94]"
+                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lumia-ink/35 transition hover:bg-lumia-ink/[0.05] hover:text-rose-600 active:scale-[0.94]"
                             aria-label="Quitar producto"
                             @click="removeLine(item.sku)"
                           >
@@ -104,7 +104,7 @@
                           <div class="flex items-center gap-0.5 rounded-full border border-lumia-ink/[0.08] bg-lumia-cream/40 p-0.5">
                             <button
                               type="button"
-                              class="flex h-9 w-9 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35"
+                              class="flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35"
                               aria-label="Reducir cantidad"
                               :disabled="item.quantity <= 1 || isQtyUpdating(item.sku)"
                               @click="updateQty(item.sku, item.quantity - 1)"
@@ -121,7 +121,7 @@
                             </span>
                             <button
                               type="button"
-                              class="flex h-9 w-9 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35"
+                              class="flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink/70 transition hover:bg-white active:scale-[0.94] disabled:opacity-35"
                               aria-label="Aumentar cantidad"
                               :disabled="isQtyUpdating(item.sku)"
                               @click="updateQty(item.sku, item.quantity + 1)"

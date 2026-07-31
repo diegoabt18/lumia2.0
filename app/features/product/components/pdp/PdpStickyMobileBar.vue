@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="min-h-9 rounded-xl border border-lumia-ink/15 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-lumia-ink transition hover:bg-lumia-cream/50 disabled:opacity-40"
+              class="min-h-11 rounded-xl border border-lumia-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-lumia-ink transition hover:bg-lumia-cream/50 disabled:opacity-40"
               :disabled="addDisabled || addPending || buyPending"
               @click="emit('buy-now')"
             >

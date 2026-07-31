@@ -9,9 +9,9 @@
     <HomeStoreBanners position="catalog_top" />
 
     <BaseContainer class="pb-28 pt-2 md:py-12 md:pb-24">
-      <!-- Barra móvil -->
+      <!-- Barra móvil / tablet -->
       <div
-        class="sticky top-0 z-30 -mx-4 mb-4 border-b border-lumia-ink/8 bg-lumia-canvas/[0.97] px-4 py-2.5 shadow-[0_10px_40px_-18px_rgba(15,15,15,0.18)] backdrop-blur-lg lg:hidden"
+        class="sticky top-16 z-30 -mx-4 mb-4 border-b border-lumia-ink/8 bg-lumia-canvas/[0.97] px-4 py-2.5 shadow-[0_10px_40px_-18px_rgba(15,15,15,0.18)] backdrop-blur-lg sm:top-[4.5rem] lg:hidden"
       >
         <div class="flex items-center gap-2">
           <div class="relative min-w-0 flex-1">
@@ -19,6 +19,7 @@
             <input
               v-model="searchInput"
               type="search"
+              name="catalog-search"
               autocomplete="off"
               placeholder="Buscar en LUMIA…"
               class="min-h-[46px] w-full rounded-2xl border border-lumia-ink/10 bg-lumia-cream/45 pl-10 pr-3 text-sm text-lumia-ink placeholder:text-lumia-ink/35 focus:border-lumia-gold/45 focus:outline-none focus:ring-2 focus:ring-lumia-gold/20"
@@ -32,19 +33,29 @@
           >
             <IconAdjustmentsHorizontal class="h-5 w-5" stroke-width="1.35" />
           </button>
+        </div>
+        <div class="mt-2 flex items-center gap-2">
           <select
             v-model="sortBy"
-            class="min-h-[46px] max-w-[34%] shrink-0 rounded-2xl border border-lumia-ink/10 bg-lumia-canvas px-2 text-[11px] font-medium text-lumia-ink"
+            class="min-h-[46px] min-w-0 flex-1 rounded-2xl border border-lumia-ink/10 bg-lumia-canvas px-3 text-xs font-medium text-lumia-ink"
             aria-label="Ordenar catálogo"
           >
             <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
           <button
             type="button"
-            class="inline-flex min-h-[46px] shrink-0 items-center justify-center rounded-2xl border border-lumia-ink/12 bg-lumia-ink px-3 text-[11px] font-semibold text-lumia-cream"
+            class="inline-flex min-h-[46px] shrink-0 items-center justify-center rounded-2xl border border-lumia-ink/12 bg-lumia-ink px-4 text-xs font-semibold text-lumia-cream"
             @click="applySearch"
           >
             Buscar
+          </button>
+          <button
+            v-if="hasActiveFilters"
+            type="button"
+            class="inline-flex min-h-[46px] shrink-0 items-center justify-center rounded-2xl border border-lumia-ink/12 px-3 text-xs font-medium text-lumia-ink/70"
+            @click="clearFilters"
+          >
+            Limpiar
           </button>
         </div>
         <div class="-mx-1 mt-2.5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -52,7 +63,7 @@
             v-for="cat in categories"
             :key="'chip-' + cat.slug"
             type="button"
-            class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold capitalize tracking-wide transition"
+            class="shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold capitalize tracking-wide transition"
             :class="
               selectedCategory === cat.slug
                 ? 'border-lumia-ink bg-lumia-ink text-lumia-cream'
@@ -178,6 +189,7 @@
           <div v-if="filtersDrawerOpen" class="fixed inset-0 z-[70] lg:hidden" aria-modal="true" role="dialog">
             <div class="absolute inset-0 bg-lumia-ink/45" @click="filtersDrawerOpen = false" />
             <div class="absolute bottom-0 left-0 right-0 max-h-[90vh] overflow-y-auto rounded-t-3xl border border-lumia-ink/10 bg-lumia-canvas p-4 pb-10" @click.stop>
+              <div class="mx-auto mb-4 h-1 w-10 rounded-full bg-lumia-ink/15" aria-hidden="true" />
               <div class="mb-4 flex items-center justify-between">
                 <h2 class="font-display text-lg font-medium">Filtros</h2>
                 <button type="button" class="text-sm font-semibold text-lumia-gold" @click="filtersDrawerOpen = false">Listo</button>

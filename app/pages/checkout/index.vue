@@ -71,7 +71,7 @@
 
               <div class="sm:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-lumia-ink/45" for="notes">Notas (opcional)</label>
-                <textarea id="notes" v-model="form.notes" rows="3" class="field-input resize-y" />
+                <textarea id="notes" v-model="form.notes" rows="3" class="lumia-field-input resize-y" />
               </div>
             </div>
 

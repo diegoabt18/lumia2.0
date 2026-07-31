@@ -30,7 +30,7 @@
         <div class="flex shrink-0 items-center gap-1 sm:gap-2">
           <NuxtLink
             to="/products"
-            class="flex h-10 w-10 items-center justify-center rounded-full text-lumia-ink/70 transition-colors hover:bg-lumia-beige/50 hover:text-lumia-ink"
+            class="flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink/70 transition-colors hover:bg-lumia-beige/50 hover:text-lumia-ink"
             aria-label="Buscar catálogo"
           >
             <IconSearch class="h-5 w-5 stroke-[1.25]" />
@@ -38,7 +38,7 @@
 
           <button
             type="button"
-            class="relative flex h-10 w-10 items-center justify-center rounded-full text-lumia-ink/70 transition-colors hover:bg-lumia-beige/50 hover:text-lumia-ink"
+            class="relative flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink/70 transition-colors hover:bg-lumia-beige/50 hover:text-lumia-ink"
             aria-label="Carrito"
             @click="$emit('open-cart')"
           >
@@ -80,7 +80,7 @@
 
           <button
             type="button"
-            class="flex h-10 w-10 items-center justify-center rounded-full text-lumia-ink md:hidden"
+            class="flex h-11 w-11 items-center justify-center rounded-full text-lumia-ink lg:hidden"
             aria-label="Menú"
             @click="mobileOpen = !mobileOpen"
           >
@@ -98,7 +98,7 @@
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
-        <div v-if="mobileOpen" class="border-t border-lumia-ink/8 py-2 md:hidden">
+        <div v-if="mobileOpen" class="border-t border-lumia-ink/8 py-2 lg:hidden">
           <nav class="flex flex-col">
             <NuxtLink
               v-for="link in navLinks"
@@ -117,7 +117,38 @@
             >
               Admin
             </NuxtLink>
+            <template v-if="isHydrated && auth.user.value">
+              <NuxtLink
+                to="/account"
+                class="flex min-h-11 items-center px-4 text-sm font-medium text-lumia-ink/80 hover:bg-lumia-beige/30"
+                @click="mobileOpen = false"
+              >
+                Mi cuenta
+              </NuxtLink>
+              <NuxtLink
+                to="/account/orders"
+                class="flex min-h-11 items-center px-4 text-sm font-medium text-lumia-ink/80 hover:bg-lumia-beige/30"
+                @click="mobileOpen = false"
+              >
+                Mis pedidos
+              </NuxtLink>
+              <NuxtLink
+                to="/account/favorites"
+                class="flex min-h-11 items-center px-4 text-sm font-medium text-lumia-ink/80 hover:bg-lumia-beige/30"
+                @click="mobileOpen = false"
+              >
+                Favoritos
+              </NuxtLink>
+              <button
+                type="button"
+                class="flex min-h-11 w-full items-center px-4 text-left text-sm font-medium text-lumia-ink/70 hover:bg-lumia-beige/30"
+                @click="onMobileLogout"
+              >
+                Cerrar sesión
+              </button>
+            </template>
             <NuxtLink
+              v-else-if="isHydrated"
               :to="loginHref"
               class="flex min-h-11 items-center px-4 text-sm font-medium hover:bg-lumia-beige/30"
               @click="mobileOpen = false"
@@ -141,6 +172,11 @@ const route = useRoute()
 const cart = useCart()
 const cartCount = computed(() => cart.count.value)
 
+async function onMobileLogout() {
+  mobileOpen.value = false
+  await auth.logout()
+}
+
 const loginHref = computed(() => {
   const p = route.path
   if (p.startsWith('/auth/login')) return '/auth/login'
@@ -155,6 +191,10 @@ const navLinks = [
 
 const mobileOpen = ref(false)
 const isHydrated = ref(false)
+
+watch(() => route.fullPath, () => {
+  mobileOpen.value = false
+})
 
 onMounted(() => {
   isHydrated.value = true

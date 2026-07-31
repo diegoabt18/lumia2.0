@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-lumia-canvas pb-24 pt-6">
+  <div class="bg-lumia-canvas pb-24 pt-6" :class="items.length ? 'pb-36 lg:pb-24' : ''">
     <BaseContainer>
       <AppBreadcrumbs
         :items="[
@@ -195,6 +195,24 @@
             </BaseButton>
           </div>
         </aside>
+      </div>
+
+      <!-- CTA fijo en móvil -->
+      <div
+        v-if="items.length"
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-lumia-ink/8 bg-lumia-canvas/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_40px_-16px_rgba(15,15,15,0.15)] backdrop-blur-lg lg:hidden"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] font-medium uppercase tracking-wide text-lumia-ink/45">Total estimado</p>
+            <p class="font-display text-xl font-semibold tabular-nums text-lumia-ink">
+              {{ formatPrice(shippingQuote.grandTotal, currency) }}
+            </p>
+          </div>
+          <BaseButton to="/checkout" class="min-h-[48px] shrink-0 px-6">
+            Ir al checkout
+          </BaseButton>
+        </div>
       </div>
     </BaseContainer>
   </div>

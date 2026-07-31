@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-lumia-canvas/90 text-lumia-ink shadow-sm backdrop-blur-sm transition hover:scale-105 disabled:opacity-50"
+    class="flex h-11 w-11 items-center justify-center rounded-full border border-white/50 bg-lumia-canvas/90 text-lumia-ink shadow-sm backdrop-blur-sm transition hover:scale-105 disabled:opacity-50"
     :class="favorited ? 'text-rose-500' : 'text-lumia-ink/70'"
     :disabled="pending"
     :aria-label="favorited ? 'Quitar de favoritos' : 'Añadir a favoritos'"
