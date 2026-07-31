@@ -1,14 +1,7 @@
-import { buildShippingConfig, quoteShipping, remainingForFreeShipping } from '#shared/pricing/shipping-cost'
+import { quoteShipping, remainingForFreeShipping } from '#shared/pricing/shipping-cost'
 
 export function useStoreShipping() {
-  const config = useRuntimeConfig()
-
-  const shippingConfig = computed(() =>
-    buildShippingConfig({
-      freeShippingThreshold: config.public.storeFreeShippingThreshold,
-      flatRate: config.public.storeShippingFlatRate,
-    })
-  )
+  const { shippingConfig } = useStoreSettings()
 
   function quote(subtotal: number) {
     return quoteShipping(subtotal, shippingConfig.value)

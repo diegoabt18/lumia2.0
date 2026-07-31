@@ -1,16 +1,16 @@
 # Lumia 2.0
 
-Tienda pública de velas artesanales. Serverless sobre **Cloudflare Workers** + **Nuxt 4**.
+Tienda pública de velas artesanales. Frontend **Nuxt 4** desplegado en **Cloudflare Workers** que actúa como proxy hacia la API Lumia (`NUXT_API_BASE_URL`).
 
-El panel de administración vive en el proyecto `lumia` (local, no desplegado).
+El panel de administración y la lógica de negocio viven en el proyecto backend `server` (Fastify + MongoDB), no en este repo.
 
 ## Stack
 
 | Capa | Tecnología |
 |------|------------|
 | Frontend | Nuxt 4, Vue 3, TypeScript, Tailwind 3 |
-| Backend | Nitro (H3) en Cloudflare Workers |
-| Base de datos | MongoDB Atlas (catálogo/ventas) + D1 (lectura edge, Fase 0+) |
+| Runtime | Nitro en Cloudflare Workers |
+| Backend | API externa Lumia (proxy transparente) |
 | Imágenes | GitHub + jsDelivr CDN |
 | Deploy | `wrangler deploy` |
 
@@ -19,19 +19,47 @@ El panel de administración vive en el proyecto `lumia` (local, no desplegado).
 ```bash
 # Requiere Node >= 24.11
 npm install
-cp .env.example .env   # configurar MONGO_CATALOG_URI, etc.
-npm run db:d1:migrate  # schema D1 local (requerido para panel admin)
+cp .env.example .env   # configurar NUXT_API_BASE_URL, NUXT_SITE_URL
 npm run dev            # http://localhost:3000
+```
+
+Para probar el build de Workers localmente:
+
+```bash
+cp .dev.vars.example .dev.vars
+npm run cf:dev         # http://localhost:8787
 ```
 
 ## Estructura
 
 ```
 app/           → UI, páginas, composables, features
-server/        → API Nitro, repositorios, conexión MongoDB
+server/        → Proxy Nitro hacia la API Lumia
 shared/        → tipos, mocks, design system, utilidades
 docs/          → documentación del proyecto
 ```
+
+## Variables de entorno
+
+Ver `.env.example`. Las imprescindibles:
+
+| Variable | Uso |
+|----------|-----|
+| `NUXT_SITE_URL` | URL canónica del sitio (SEO, cookies OAuth) |
+| `NUXT_API_BASE_URL` | Base de la API Lumia (`https://api.lumiadalistore.com`) |
+
+En producción, `NUXT_API_BASE_URL` va en `wrangler.jsonc` bajo `env.production.vars`.
+
+## Scripts
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Desarrollo local (Nuxt) |
+| `npm run build` | Build producción (Cloudflare) |
+| `npm run cf:deploy` | Build + deploy a Workers |
+| `npm run cf:deploy:prod` | Deploy al entorno `production` |
+| `npm run cf:dev` | Preview con Wrangler |
+| `npm run cf:secrets:prod` | Sube secretos opcionales desde `.env` |
 
 ## Documentación por módulo
 
@@ -43,7 +71,7 @@ Cada carpeta tiene su `README.md`:
 - `app/components/product/` — tarjetas y galería
 - `app/features/shell/` — layout público
 - `app/features/cart/` — estado del carrito
-- `server/` — API y persistencia
+- `server/` — proxy API
 - `shared/design-system/` — tokens de diseño
 
 ## Sistema de diseño
@@ -51,58 +79,3 @@ Cada carpeta tiene su `README.md`:
 - Referencia visual: **`/design-system`**
 - Markdown: `docs/DESIGN_SYSTEM.md`
 - Tokens: `shared/design-system/tokens.ts`
-
-## Scripts
-
-| Comando | Descripción |
-|---------|-------------|
-| `npm run dev` | Desarrollo local |
-| `npm run build` | Build producción (Cloudflare) |
-| `npm run cf:deploy` | Build + deploy a Workers |
-| `npm run cf:dev` | Preview con Wrangler |
-| `npm run db:d1:setup` | Schema D1 local + guía para base remota |
-| `npm run db:d1:migrate:remote` | Schema D1 en Cloudflare (tras crear la base) |
-
-### Catálogo D1 (Fase 0)
-
-```bash
-npm run db:d1:setup              # aplica 001_catalog_schema.sql en local
-npm run db:d1:create             # crea lumia-catalog en Cloudflare (pega database_id en wrangler.jsonc)
-npm run db:d1:migrate:remote     # schema remoto (una vez)
-npm run cf:deploy:prod           # incluye binding CATALOG_DB en applumia2
-# Dashboard → D1 → lumia-catalog → Enable Read Replication
-```
-
-Variable `NUXT_CATALOG_SOURCE`: `mongo` (default) | `d1` | `auto`. Ver `server/database/README.md`.
-
-### Panel admin (Fase 3)
-
-Ruta `/admin/migration` (rol `admin` en sesión). Sync Mongo → D1 desde la UI.
-
-### Cutover producción (Fase 4)
-
-Checklist tras `cf:deploy:prod`:
-
-1. `npm run db:d1:migrate:remote` — schema D1 remoto
-2. `wrangler.jsonc` → `env.production.d1_databases` con binding `CATALOG_DB`
-3. Dashboard → D1 → `lumia-catalog` → **Enable Read Replication**
-4. `/admin/migration` → **Sync completa** (o dry-run primero)
-5. Verificar **Fuente activa: D1** en el panel (`NUXT_CATALOG_SOURCE=auto`)
-6. `GET /api/health` → `catalogD1.active` debe ser `"d1"`
-
-**Sync automática** (opcional): programa un cron externo o Cloudflare Cron Trigger:
-
-```bash
-curl -X POST https://lumiadalistore.com/api/cron/sync-catalog \
-  -H "Authorization: Bearer $NUXT_CRON_SECRET"
-```
-
-Requiere `NUXT_CRON_SECRET` en secretos de producción (`npm run cf:secrets:prod`).
-
-### Lectura catálogo (Fase 2)
-
-Endpoints públicos usan `server/core/catalog/application/catalog-reader.ts`:
-
-- `GET /api/products`, `/api/products/:slug`, `/api/categories`, sitemap
-- Modo `auto`: D1 si hay binding + datos sync; si no, Mongo
-- Carrito/stock sigue en Mongo

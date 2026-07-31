@@ -52,6 +52,7 @@
           </button>
 
           <ClientOnly>
+            <NotificationsBell />
             <div v-if="isHydrated && !auth.user.value" class="hidden items-center gap-2 sm:flex">
               <NuxtLink
                 :to="loginHref"

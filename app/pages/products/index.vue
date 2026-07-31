@@ -6,6 +6,8 @@
       </BaseContainer>
     </div>
 
+    <HomeStoreBanners position="catalog_top" />
+
     <BaseContainer class="pb-28 pt-2 md:py-12 md:pb-24">
       <!-- Barra móvil -->
       <div

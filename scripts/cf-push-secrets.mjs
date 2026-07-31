@@ -1,5 +1,5 @@
 /**
- * Sube secretos de `.env` a Cloudflare Workers con `wrangler secret bulk`.
+ * Sube secretos opcionales de `.env` a Cloudflare Workers con `wrangler secret bulk`.
  *
  * Requisito: `npx wrangler login` en esta terminal (una sola vez).
  *
@@ -15,15 +15,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
 
+/** Solo claves que el frontend proxy pueda necesitar como secreto en Workers. */
 const SECRET_KEYS = [
-  'NUXT_RESEND_API_KEY',
-  'NUXT_RESEND_FROM',
-  'NUXT_ORDER_NOTIFY_EMAIL',
-  'NUXT_TURNSTILE_SECRET_KEY',
   'NUXT_PUBLIC_TURNSTILE_SITE_KEY',
-  'NUXT_MP_ACCESS_TOKEN',
-  'NUXT_MP_WEBHOOK_SECRET',
-  'NUXT_PUBLIC_MP_PUBLIC_KEY',
   'NUXT_PUBLIC_WHATSAPP_PHONE',
   'NUXT_PUBLIC_PRODUCT_IMAGES_CDN_BASE',
 ]

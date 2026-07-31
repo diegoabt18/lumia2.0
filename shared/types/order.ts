@@ -28,4 +28,6 @@ export interface OrderSummary {
   shippingCost: number
   items: OrderItem[]
   createdAt: string
+  cancellationRequested?: boolean
+  cancellationRequestStatus?: string
 }

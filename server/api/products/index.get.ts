@@ -8,13 +8,16 @@ export default defineEventHandler(async (event) => {
   const search = typeof query.search === 'string' ? query.search : undefined
   const categoryRaw = typeof query.category === 'string' ? query.category.trim() : undefined
   const category = categoryRaw?.split(',')[0]?.trim() || undefined
+  const sort = typeof query.sort === 'string' ? query.sort : undefined
+  const promo = typeof query.promo === 'string' ? query.promo : undefined
+  const slugs = typeof query.slugs === 'string' ? query.slugs : undefined
 
   const data = await lumiaApiFetch<{
     products?: unknown[]
     items?: unknown[]
     pagination?: { page: number; limit: number; total: number; totalPages: number }
   }>(event, '/api/products', {
-    query: { page, limit, search, category },
+    query: { page, limit, search, category, sort, promo, slugs },
   })
 
   const products = data.products?.length ? data.products : data.items ?? []

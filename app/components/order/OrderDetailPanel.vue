@@ -75,6 +75,33 @@
       </ol>
     </div>
 
+    <div v-if="isHistoryView && canCancel" class="mt-6 rounded-xl border border-rose-200 bg-rose-50/60 p-6">
+      <h2 class="font-semibold text-lumia-ink">Cancelar pedido</h2>
+      <p class="mt-2 text-sm text-lumia-ink/65">
+        {{
+          canDirectCancel
+            ? 'Puedes cancelar este pedido mientras no esté pagado.'
+            : 'Puedes solicitar la cancelación; el equipo revisará tu solicitud.'
+        }}
+      </p>
+      <textarea
+        v-model="cancelReason"
+        rows="3"
+        class="lumia-field-input mt-4 resize-y"
+        placeholder="Motivo (opcional)"
+      />
+      <BaseButton
+        type="button"
+        variant="secondary"
+        class="mt-4 border-rose-300 text-rose-700"
+        :disabled="cancelPending"
+        @click="onCancel"
+      >
+        {{ cancelPending ? 'Procesando…' : canDirectCancel ? 'Cancelar pedido' : 'Solicitar cancelación' }}
+      </BaseButton>
+      <p v-if="cancelMessage" class="mt-3 text-sm text-lumia-ink/70">{{ cancelMessage }}</p>
+    </div>
+
     <div v-if="whatsappOrder" class="mt-6">
       <WhatsAppOrderButton :order="whatsappOrder" />
     </div>
@@ -98,8 +125,52 @@ const props = withDefaults(
   { isHistoryView: false }
 )
 
+const emit = defineEmits<{ (e: 'updated'): void }>()
+
 const { formatPrice, formatStoreDate } = useUtils()
 const { user } = useAuth()
+const toast = useToast()
+
+const cancelReason = ref('')
+const cancelPending = ref(false)
+const cancelMessage = ref('')
+
+const canDirectCancel = computed(
+  () =>
+    props.order.paymentStatus === 'pending_manual' &&
+    !['cancelled', 'shipped', 'delivered', 'expired'].includes(props.order.status)
+)
+
+const canRequestCancel = computed(
+  () =>
+    props.order.paymentStatus === 'paid' &&
+    !props.order.cancellationRequested &&
+    !['cancelled', 'delivered', 'expired'].includes(props.order.status)
+)
+
+const canCancel = computed(() => props.isHistoryView && (canDirectCancel.value || canRequestCancel.value))
+
+async function onCancel() {
+  cancelPending.value = true
+  cancelMessage.value = ''
+  try {
+    const path = canDirectCancel.value
+      ? `/api/orders/${encodeURIComponent(props.order.id)}/cancel`
+      : `/api/orders/${encodeURIComponent(props.order.id)}/cancel-request`
+    const body = canDirectCancel.value
+      ? { reason: cancelReason.value.trim() || undefined }
+      : { reason: cancelReason.value.trim() || 'Solicitud del cliente' }
+    const res = await $fetch<{ message?: string }>(path, { method: 'POST', body })
+    cancelMessage.value = res.message ?? 'Listo'
+    toast.success(cancelMessage.value)
+    emit('updated')
+  } catch (e: unknown) {
+    const err = e as { data?: { message?: string } }
+    toast.error(err?.data?.message ?? 'No se pudo procesar la cancelación')
+  } finally {
+    cancelPending.value = false
+  }
+}
 
 function statusLabel(status: string) {
   if (status === 'pending_manual') return 'Pago pendiente'

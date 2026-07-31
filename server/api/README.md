@@ -1,58 +1,82 @@
 # API — Endpoints HTTP
 
-Handlers Nitro en `server/api/`. Auto-enrutados por convención de archivos.
+Handlers Nitro en `server/api/`. Auto-enrutados por convención de archivos. Casi todos delegan en `proxyToLumiaApi()` hacia la API Lumia.
 
 ## Catálogo
 
 | Archivo | Ruta | Descripción |
 |---------|------|-------------|
-| `products/index.get.ts` | `GET /api/products` | Listado paginado (`?page=&limit=&search=`) |
+| `products/index.get.ts` | `GET /api/products` | Listado (`page`, `limit`, `search`, `sort`, `promo`, `slugs`, …) |
 | `products/[slug].get.ts` | `GET /api/products/:slug` | Detalle por slug |
+| `products/[slug]/feedback.get.ts` | `GET /api/products/:slug/feedback` | Reseñas |
+| `products/[slug]/feedback.post.ts` | `POST /api/products/:slug/feedback` | Crear reseña |
+| `categories/index.get.ts` | `GET /api/categories` | Categorías |
 
-## Sistema
+## Tienda (settings públicos)
 
-| Archivo | Ruta | Descripción |
-|---------|------|-------------|
-| `health.get.ts` | `GET /api/health` | Ping + estado MongoDB |
-
-## Respuestas
-
-Listado exitoso:
-
-```json
-{
-  "products": [...],
-  "pagination": { "page": 1, "limit": 20, "total": 42, "totalPages": 3 },
-  "source": "mongodb"
-}
-```
-
-Sin `MONGO_CATALOG_URI` → **503** y el frontend usa mocks vía `useCatalog()`.
+| Archivo | Ruta |
+|---------|------|
+| `store/banners.get.ts` | `GET /api/store/banners` |
+| `store/shipping-settings.get.ts` | `GET /api/store/shipping-settings` |
+| `store/currency-settings.get.ts` | `GET /api/store/currency-settings` |
+| `store/customer-settings.get.ts` | `GET /api/store/customer-settings` |
 
 ## Auth (Google OAuth)
 
-| Archivo | Ruta | Descripción |
-|---------|------|-------------|
-| `auth/google.get.ts` | `GET /api/auth/google` | Inicia flujo OAuth |
-| `auth/google/callback.get.ts` | `GET /api/auth/google/callback` | Callback de Google |
-| `auth/me.get.ts` | `GET /api/auth/me` | Sesión actual |
-| `auth/logout.post.ts` | `POST /api/auth/logout` | Cierra sesión |
+| Archivo | Ruta | Notas |
+|---------|------|-------|
+| `auth/google.get.ts` | `GET /api/auth/google` | Inicia OAuth (redirect) |
+| `auth/google/callback.get.ts` | `GET /api/auth/google/callback` | Callback |
+| `auth/me.get.ts` | `GET /api/auth/me` | Sesión actual (mapeada) |
+| `auth/profile.patch.ts` | `PATCH /api/auth/profile` | Actualizar perfil |
+| `auth/logout.post.ts` | `POST /api/auth/logout` | Cerrar sesión |
+| `auth/logout-all.post.ts` | `POST /api/auth/logout-all` | Cerrar todas las sesiones |
+| `auth/sessions/index.get.ts` | `GET /api/auth/sessions` | Listar sesiones |
+| `auth/sessions/revoke.post.ts` | `POST /api/auth/sessions/revoke` | Revocar sesión |
 
-### Códigos de error de login (cliente)
+## Cuenta
 
-El callback redirige a `/auth/login?error=LG_ERROR00X`. El mensaje en UI es genérico (toast); el detalle técnico queda en logs (`[oauth]`).
+| Archivo | Ruta |
+|---------|------|
+| `account/favorites/index.get.ts` | `GET /api/account/favorites` |
+| `account/favorites/toggle.post.ts` | `POST /api/account/favorites/toggle` |
+| `account/favorites/sync.post.ts` | `POST /api/account/favorites/sync` |
+| `account/preferences.patch.ts` | `PATCH /api/account/preferences` |
 
-| Código | Causa interna (servidor) |
-|--------|---------------------------|
-| `LG_ERROR001` | `oauth_state` — cookie/state CSRF expiró o no coincide (www/apex, sesión caducada) |
-| `LG_ERROR002` | `google_config` — faltan `NUXT_GOOGLE_*` o `NUXT_JWT_SECRET` |
-| `LG_ERROR003` | `auth_db` — falta o no conecta `NUXT_MONGO_AUTH_URI` |
-| `LG_ERROR004` | `google_token` — falló intercambio code→token con Google |
-| `LG_ERROR005` | `google_user` — id_token inválido o sin email |
-| `LG_ERROR006` | `oauth_server` — excepción no controlada en callback |
-| `LG_ERROR007` | `email_google_conflict` — el email ya está vinculado a otro Google ID (no se sobrescribe) |
-| `LG_ERROR000` | Desconocido |
+## Carrito y pedidos
 
-**Regla de identidad:** `google_id` es único y primario. Si existe un usuario con el mismo email pero distinto `google_id`, el login se rechaza (`409` → `LG_ERROR007`).
+| Archivo | Ruta |
+|---------|------|
+| `cart/index.get.ts` | `GET /api/cart` |
+| `cart/index.delete.ts` | `DELETE /api/cart` |
+| `cart/items.post.ts` | `POST /api/cart/items` |
+| `cart/items.patch.ts` | `PATCH /api/cart/items` |
+| `cart/items.delete.ts` | `DELETE /api/cart/items` |
+| `orders/create.post.ts` | `POST /api/orders/create` |
+| `orders/mine.get.ts` | `GET /api/orders/mine` |
+| `orders/mine/[id].get.ts` | `GET /api/orders/mine/:id` |
+| `orders/[id]/cancel.post.ts` | `POST /api/orders/:id/cancel` |
+| `orders/[id]/cancel-request.post.ts` | `POST /api/orders/:id/cancel-request` |
+| `payments/manual.post.ts` | `POST /api/payments/manual` |
 
-Definición compartida: `shared/auth/login-errors.ts`.
+## Notificaciones
+
+| Archivo | Ruta |
+|---------|------|
+| `notifications/index.get.ts` | `GET /api/notifications` |
+| `notifications/unread-count.get.ts` | `GET /api/notifications/unread-count` |
+| `notifications/read.patch.ts` | `PATCH /api/notifications/read` |
+| `notifications/read-all.patch.ts` | `PATCH /api/notifications/read-all` |
+| `notifications/[id].delete.ts` | `DELETE /api/notifications/:id` |
+
+## Sistema
+
+| Archivo | Ruta |
+|---------|------|
+| `health.get.ts` | `GET /api/health` |
+| `newsletter/subscribe.post.ts` | `POST /api/newsletter/subscribe` |
+| `cdn/images.get.ts` | `GET /api/cdn/images` |
+
+## Errores de login OAuth
+
+El callback redirige a `/auth/login?error=LG_ERROR00X`. Definición compartida: `shared/auth/login-errors.ts`.

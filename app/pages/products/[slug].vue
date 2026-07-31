@@ -29,9 +29,12 @@
           <div class="flex flex-col duration-500">
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">LUMIA</p>
-              <h1 class="mt-3 font-display text-4xl font-medium leading-tight text-lumia-ink md:text-5xl">
-                {{ product.name }}
-              </h1>
+              <div class="mt-3 flex items-start justify-between gap-4">
+                <h1 class="font-display text-4xl font-medium leading-tight text-lumia-ink md:text-5xl">
+                  {{ product.name }}
+                </h1>
+                <ProductWishlistButton :product-slug="product.slug" class="shrink-0" />
+              </div>
             </div>
 
             <div class="mt-5">

@@ -103,16 +103,20 @@ export function mapApiUserToAuthUser(data: unknown): { user: Record<string, unkn
   if (!apiUser) return { user: null }
 
   const email = typeof apiUser.email === 'string' ? apiUser.email : undefined
+  const name = typeof apiUser.name === 'string' ? apiUser.name : undefined
   const nickname = typeof apiUser.nickname === 'string' ? apiUser.nickname : undefined
   const role = apiUser.role === 'admin' ? 'admin' : 'user'
+  const prefs = apiUser.notificationPreferences as Record<string, boolean> | undefined
 
   return {
     user: {
       id: String(apiUser.id ?? ''),
-      name: nickname ?? email?.split('@')[0] ?? 'Usuario',
+      name: name ?? nickname ?? email?.split('@')[0] ?? 'Usuario',
+      nickname,
       email,
       avatar: typeof apiUser.avatar === 'string' ? apiUser.avatar : undefined,
       role,
+      notificationPreferences: prefs,
     },
   }
 }

@@ -1,9 +1,15 @@
 interface AuthUser {
   id: string
   name: string
+  nickname?: string
   email?: string
   avatar?: string
   role: 'user' | 'admin'
+  notificationPreferences?: {
+    promotions?: boolean
+    orderStatus?: boolean
+    newProducts?: boolean
+  }
 }
 
 export function useAuth() {

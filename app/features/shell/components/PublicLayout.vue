@@ -26,6 +26,7 @@ onMounted(() => {
     } else if (payload.source === 'local') {
       cartStore.$patch({ apiEnabled: false })
     }
+    void useWishlist().load()
   })
 })
 </script>

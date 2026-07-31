@@ -26,7 +26,7 @@
           </div>
         </template>
 
-        <OrderDetailPanel v-else-if="order" :order="order" is-history-view />
+        <OrderDetailPanel v-else-if="order" :order="order" is-history-view @updated="refresh" />
       </div>
     </BaseContainer>
   </div>

@@ -1,6 +1,7 @@
 <template>
   <div>
     <HomeHero />
+    <HomeStoreBanners position="homepage_secondary" />
     <HomeFeaturedProducts :items="featuredItems" :loading="featuredPending" />
     <HomeCategoryGrid />
     <LazyHomeBrandStory />

@@ -48,6 +48,10 @@
         </span>
       </div>
 
+      <div class="absolute right-1.5 top-1.5 z-20 md:right-2 md:top-2">
+        <ProductWishlistButton :product-slug="product.slug" />
+      </div>
+
       <button
         type="button"
         class="absolute bottom-2 right-2 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/45 bg-lumia-ink text-lumia-cream shadow-[0_10px_28px_-8px_rgba(15,15,15,0.45)] transition active:scale-[0.92] disabled:opacity-35 md:hidden"

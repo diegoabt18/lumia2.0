@@ -12,6 +12,27 @@ export interface ShippingConfig {
   applyThresholdOn: ThresholdApplication
 }
 
+/** Mapea respuesta de `/api/store/shipping-settings` al config de cotización. */
+export function mapApiShippingSettings(data: {
+  shippingEnabled?: boolean
+  freeShippingEnabled?: boolean
+  freeShippingThreshold?: number
+  calculationType?: string
+  flatRateEnabled?: boolean
+  flatRate?: number
+  applyThresholdOn?: string
+}): ShippingConfig {
+  return {
+    shippingEnabled: data.shippingEnabled ?? false,
+    freeShippingEnabled: data.freeShippingEnabled ?? false,
+    freeShippingThreshold: Math.max(0, Number(data.freeShippingThreshold) || 0),
+    calculationType: data.calculationType ?? 'flat_rate',
+    flatRateEnabled: data.flatRateEnabled ?? false,
+    flatRate: Math.max(0, Number(data.flatRate) || 0),
+    applyThresholdOn: (data.applyThresholdOn as ThresholdApplication) ?? 'subtotal',
+  }
+}
+
 export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
   shippingEnabled: false,
   freeShippingEnabled: false,
