@@ -36,9 +36,15 @@ export function useWishlist() {
       try {
         if (auth.user.value) {
           const res = await $fetch<{ slugs: string[] }>('/api/account/favorites', { timeout: 4_000 })
-          slugs.value = res.slugs ?? []
+          const next = res.slugs ?? []
+          const prevKey = slugs.value.join('\0')
+          const nextKey = next.join('\0')
+          if (nextKey !== prevKey) slugs.value = next
         } else {
-          slugs.value = readLocalSlugs()
+          const next = readLocalSlugs()
+          const prevKey = slugs.value.join('\0')
+          const nextKey = next.join('\0')
+          if (nextKey !== prevKey) slugs.value = next
         }
       } catch {
         slugs.value = auth.user.value ? [] : readLocalSlugs()

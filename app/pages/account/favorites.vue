@@ -30,40 +30,56 @@ const auth = useAuth()
 const catalog = useCatalog()
 const { slugs, load, loaded } = useWishlist()
 
-const pending = ref(true)
+const loadingProducts = ref(false)
 const products = ref<Product[]>([])
+let lastFetchedSlugsKey = ''
 
-async function fetchProducts() {
-  await load()
-  const list = [...slugs.value]
-  if (!list.length) {
+const pending = computed(
+  () => Boolean(auth.user.value) && (!loaded.value || loadingProducts.value)
+)
+
+async function fetchProductsForSlugs(slugList: readonly string[]) {
+  const key = slugList.join('\0')
+  if (key === lastFetchedSlugsKey) return
+  lastFetchedSlugsKey = key
+
+  if (!slugList.length) {
     products.value = []
-    pending.value = false
     return
   }
-  pending.value = true
+
+  loadingProducts.value = true
   try {
-    const res = await catalog.fetchProducts({ slugs: list.join(','), limit: list.length })
+    const res = await catalog.fetchProducts({ slugs: slugList.join(','), limit: slugList.length })
     const map = new Map(res.products.map((p) => [p.slug, p]))
-    products.value = list.map((slug) => map.get(slug)).filter(Boolean) as Product[]
+    products.value = slugList.map((slug) => map.get(slug)).filter(Boolean) as Product[]
   } catch {
     products.value = []
   } finally {
-    pending.value = false
+    loadingProducts.value = false
   }
 }
 
 watch(
-  () => auth.user.value?.id,
-  () => {
-    if (auth.loaded.value) void fetchProducts()
+  [() => auth.user.value?.id, () => auth.loaded.value, slugs, loaded],
+  async ([userId, authLoaded, slugList, wishlistLoaded]) => {
+    if (!authLoaded) return
+
+    if (!userId) {
+      products.value = []
+      lastFetchedSlugsKey = ''
+      return
+    }
+
+    if (!wishlistLoaded) {
+      await load()
+      return
+    }
+
+    await fetchProductsForSlugs(slugList)
   },
   { immediate: true }
 )
-
-watch(slugs, () => {
-  if (loaded.value) void fetchProducts()
-})
 
 useHead({ title: 'Favoritos — LUMIA' })
 </script>
