@@ -49,9 +49,9 @@
           :free-shipping="shippingQuote.freeShipping"
         />
 
-        <div class="mt-3 rounded-xl border border-lumia-ink/8 bg-white p-3 shadow-soft sm:mt-6 sm:rounded-2xl sm:p-4 md:p-6 lg:order-1 lg:mt-0 lg:p-8">
-          <div class="mb-4 flex flex-col gap-3 rounded-lg border border-lumia-ink/10 bg-lumia-cream/35 p-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:rounded-2xl sm:p-6">
-            <div>
+        <div class="mt-3 min-w-0 rounded-xl border border-lumia-ink/8 bg-white p-3 shadow-soft sm:mt-6 sm:rounded-2xl sm:p-4 md:p-6 lg:order-1 lg:mt-0 lg:p-8">
+          <div class="mb-4 flex flex-col gap-3 rounded-lg border border-lumia-ink/10 bg-lumia-cream/35 p-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:rounded-2xl sm:p-6">
+            <div class="min-w-0 flex-1">
               <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">Identificación</p>
               <p v-if="user" class="mt-1.5 text-sm text-lumia-ink/65 sm:mt-2">
                 Sesión activa: el pedido quedará vinculado a tu cuenta.
@@ -60,7 +60,7 @@
                 Entra con Google o compra como invitado.
               </p>
             </div>
-            <GoogleSignInButton v-if="!user" block class="w-full shrink-0 sm:min-w-[240px]" @click="loginWithGoogle('/checkout')" />
+            <GoogleSignInButton v-if="!user" block class="shrink-0 sm:!w-auto" @click="loginWithGoogle('/checkout')" />
           </div>
 
           <form id="checkout-form" @submit.prevent="onSubmit">

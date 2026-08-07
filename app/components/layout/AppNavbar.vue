@@ -7,9 +7,26 @@
         <div class="flex min-w-0 flex-1 items-center pr-1 sm:pr-2">
           <NuxtLink
             to="/"
-            class="font-display text-2xl font-semibold tracking-[0.2em] text-lumia-ink transition-opacity hover:opacity-90 sm:text-3xl"
+            class="inline-flex shrink-0 items-center transition-opacity hover:opacity-90"
+            aria-label="LUMIA — Inicio"
           >
-            LUMIA
+            <img
+              v-if="!logoFailed"
+              :src="logoSrc"
+              alt="LUMIA"
+              class="h-8 w-auto max-w-[9.5rem] object-contain object-left sm:h-9 lg:h-10"
+              width="160"
+              height="40"
+              decoding="async"
+              fetchpriority="high"
+              @error="logoFailed = true"
+            />
+            <span
+              v-else
+              class="font-display text-2xl font-semibold tracking-[0.2em] text-lumia-ink sm:text-3xl"
+            >
+              LUMIA
+            </span>
           </NuxtLink>
         </div>
 
@@ -164,8 +181,18 @@
 
 <script setup lang="ts">
 import { IconShoppingBag, IconSearch, IconMenu2, IconX } from '@tabler/icons-vue'
+import { buildFolderImageUrl } from '#shared/cdn-images/numbered-images'
+import { DEFAULT_PRODUCT_IMAGES_CDN_BASE } from '#shared/product-images/constants'
 
 defineEmits<{ (e: 'open-cart'): void }>()
+
+const config = useRuntimeConfig()
+const cdnBase =
+  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) ||
+  DEFAULT_PRODUCT_IMAGES_CDN_BASE
+
+const logoSrc = computed(() => buildFolderImageUrl(cdnBase, 'main_logo', 'logo.avif'))
+const logoFailed = ref(false)
 
 const auth = useAuth()
 const route = useRoute()

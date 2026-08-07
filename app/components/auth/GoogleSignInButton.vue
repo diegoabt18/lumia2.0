@@ -52,6 +52,8 @@ defineEmits<{ click: [event: MouseEvent] }>()
 <style scoped>
 .google-sign-in-btn {
   display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
   min-height: 44px;
   align-items: center;
   justify-content: center;
@@ -108,6 +110,9 @@ defineEmits<{ click: [event: MouseEvent] }>()
 }
 
 .google-sign-in-btn__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
