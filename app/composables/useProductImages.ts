@@ -1,7 +1,6 @@
 import type { GalleryLayoutMode, ProductImageFormat } from '#shared/product-images/types'
 import type { ProductImageVariantKey } from '#shared/product-images/types'
 import {
-  DEFAULT_PRODUCT_IMAGES_CDN_BASE,
   buildGalleryVariantUrl,
   buildProductVariantUrl,
   resolveProductImagePreviewSrc as resolvePreviewSrc,
@@ -25,10 +24,8 @@ export const PRODUCT_IMAGE_SIZES: ProductImageSize[] = [
 ]
 
 export function useProductImages() {
+  const { productImagesCdnBase: base } = useImageCdn()
   const config = useRuntimeConfig()
-  const base =
-    (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) ||
-    DEFAULT_PRODUCT_IMAGES_CDN_BASE
   const galleryLayout =
     (config.public.productImageGalleryLayout as GalleryLayoutMode | undefined) ?? 'flat'
 

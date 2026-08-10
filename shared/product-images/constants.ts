@@ -1,11 +1,10 @@
+import { resolveProductImagesCdnBase } from '../image-cdn'
 import type { GalleryLayoutMode } from './types'
 
 /**
- * Raw GitHub por defecto (`lumia_images`).
- * Sobreescribible con `runtimeConfig.public.productImagesCdnBase`.
+ * Base CDN de productos por defecto (`{IMAGE_CDN_URL}/products`).
+ * Sobreescribible con runtimeConfig.
  */
-export const DEFAULT_PRODUCT_IMAGES_CDN_BASE =
-  'https://raw.githubusercontent.com/lumiadali/lumia_images/refs/heads/main/products'
+export const DEFAULT_PRODUCT_IMAGES_CDN_BASE = resolveProductImagesCdnBase()
 
-/** Por defecto las galerías del estudio están en la misma carpeta que el principal (`flat`). */
 export const DEFAULT_GALLERY_LAYOUT: GalleryLayoutMode = 'flat'

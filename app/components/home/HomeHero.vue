@@ -6,10 +6,10 @@
   >
     <div v-if="slides.length" class="absolute inset-0" aria-hidden="true">
       <template v-if="slides.length === 1">
-        <NuxtImg
+        <LumiaImage
           :src="slides[0]"
           alt=""
-          class="h-full w-full object-cover"
+          img-class="h-full w-full object-cover"
           loading="eager"
           fetchpriority="high"
           sizes="100vw"
@@ -23,10 +23,10 @@
           class="hero-slide absolute inset-0"
           :class="{ 'hero-slide--active': index === activeIndex }"
         >
-          <NuxtImg
+          <LumiaImage
             :src="src"
             alt=""
-            class="hero-slide__img h-full w-full object-cover"
+            img-class="hero-slide__img h-full w-full object-cover"
             :loading="index === 0 ? 'eager' : 'lazy'"
             :fetchpriority="index === 0 ? 'high' : 'auto'"
             sizes="100vw"
@@ -82,12 +82,11 @@
 import { discoverHomeHeroSlides } from '~/composables/useHomeHeroImages'
 
 const config = useRuntimeConfig()
-const cdnBase =
-  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
+const { imageCdnUrl } = useImageCdn()
 const maxSlides = Math.min(12, Math.max(1, Number(config.public.homeHeroMaxSlides) || 8))
 const intervalMs = Math.max(3000, Number(config.public.homeHeroSlideIntervalMs) || 5500)
 
-const { data: slideData } = useAsyncData('home-hero-slides', () => discoverHomeHeroSlides(cdnBase, maxSlides), {
+const { data: slideData } = useAsyncData('home-hero-slides', () => discoverHomeHeroSlides(imageCdnUrl, maxSlides), {
   default: () => [] as string[],
 })
 

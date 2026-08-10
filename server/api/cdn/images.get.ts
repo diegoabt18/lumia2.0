@@ -2,16 +2,17 @@ import {
   discoverFixedImage,
   discoverNumberedImages,
 } from '#shared/cdn-images/numbered-images'
+import { resolveImageCdnUrl } from '#shared/image-cdn'
 import { setPublicCacheHeaders } from '../../utils/memory-cache'
 import { withServerTimeout } from '../../utils/server-timeout'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const config = useRuntimeConfig()
-  const cdnBase =
+  const publicCfg = config.public as Record<string, unknown>
+  const cdnRoot =
     (typeof query.base === 'string' && query.base.trim()) ||
-    (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) ||
-    ''
+    resolveImageCdnUrl(typeof publicCfg.imageCdnUrl === 'string' ? publicCfg.imageCdnUrl : '')
 
   const folder = typeof query.folder === 'string' ? query.folder.trim() : ''
   if (!folder || !/^[a-z0-9_-]+$/i.test(folder)) {
@@ -24,10 +25,10 @@ export default defineEventHandler(async (event) => {
   setPublicCacheHeaders(event, 300)
 
   if (file) {
-    const url = await withServerTimeout(discoverFixedImage(cdnBase, folder, file), 4_000, 'cdn image')
+    const url = await withServerTimeout(discoverFixedImage(cdnRoot, folder, file), 4_000, 'cdn image')
     return { urls: url ? [url] : [] }
   }
 
-  const urls = await withServerTimeout(discoverNumberedImages(cdnBase, folder, max), 6_000, 'cdn images')
+  const urls = await withServerTimeout(discoverNumberedImages(cdnRoot, folder, max), 6_000, 'cdn images')
   return { urls }
 })

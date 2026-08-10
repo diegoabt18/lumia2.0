@@ -3,11 +3,11 @@
     <BaseContainer>
       <div class="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
         <div class="relative aspect-[5/4] overflow-hidden rounded-2xl bg-lumia-beige/50 shadow-soft sm:aspect-[4/5] lg:aspect-auto lg:min-h-[32rem]">
-          <NuxtImg
+          <LumiaImage
             v-if="historyImage"
             :src="historyImage"
             alt="Artesanía LUMIA"
-            class="h-full w-full object-cover"
+            img-class="h-full w-full object-cover"
             sizes="(max-width: 1024px) 100vw, 50vw"
           />
         </div>
@@ -36,13 +36,11 @@
 <script setup lang="ts">
 import { discoverBrandHistoryImage } from '~/composables/useHomeHeroImages'
 
-const config = useRuntimeConfig()
-const cdnBase =
-  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
+const { imageCdnUrl } = useImageCdn()
 
 const { data: historyImage } = useAsyncData(
   'home-brand-history-image',
-  () => discoverBrandHistoryImage(cdnBase),
+  () => discoverBrandHistoryImage(imageCdnUrl),
   { server: false, lazy: true, default: () => null as string | null }
 )
 </script>

@@ -182,16 +182,12 @@
 <script setup lang="ts">
 import { IconShoppingBag, IconSearch, IconMenu2, IconX } from '@tabler/icons-vue'
 import { buildFolderImageUrl } from '#shared/cdn-images/numbered-images'
-import { DEFAULT_PRODUCT_IMAGES_CDN_BASE } from '#shared/product-images/constants'
 
 defineEmits<{ (e: 'open-cart'): void }>()
 
-const config = useRuntimeConfig()
-const cdnBase =
-  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) ||
-  DEFAULT_PRODUCT_IMAGES_CDN_BASE
+const { imageCdnUrl } = useImageCdn()
 
-const logoSrc = computed(() => buildFolderImageUrl(cdnBase, 'main_logo', 'logo.avif'))
+const logoSrc = computed(() => buildFolderImageUrl(imageCdnUrl, 'main_logo', 'logo.avif'))
 const logoFailed = ref(false)
 
 const auth = useAuth()

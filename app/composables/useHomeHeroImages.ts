@@ -15,19 +15,19 @@ async function fetchCdnUrls(
   return res.urls ?? []
 }
 
-export async function discoverHomeHeroSlides(productCdnBase: string, maxSlides = 8): Promise<string[]> {
-  return fetchCdnUrls('home', { max: maxSlides, base: productCdnBase })
+export async function discoverHomeHeroSlides(imageCdnUrl: string, maxSlides = 8): Promise<string[]> {
+  return fetchCdnUrls('home', { max: maxSlides, base: imageCdnUrl })
 }
 
 export async function discoverMomentsGalleryImages(
-  productCdnBase: string,
+  imageCdnUrl: string,
   maxImages = 12
 ): Promise<string[]> {
-  return fetchCdnUrls('moments', { max: maxImages, base: productCdnBase })
+  return fetchCdnUrls('moments', { max: maxImages, base: imageCdnUrl })
 }
 
-export async function discoverBrandHistoryImage(productCdnBase: string): Promise<string | null> {
-  const urls = await fetchCdnUrls('history', { file: 'image.avif', base: productCdnBase })
+export async function discoverBrandHistoryImage(imageCdnUrl: string): Promise<string | null> {
+  const urls = await fetchCdnUrls('history', { file: 'image.avif', base: imageCdnUrl })
   return urls[0] ?? null
 }
 

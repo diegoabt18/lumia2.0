@@ -19,7 +19,7 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ['nitro-cloudflare-dev', '@pinia/nuxt', '@nuxt/image', '@vueuse/nuxt'],
+  modules: ['nitro-cloudflare-dev', '@pinia/nuxt', '@vueuse/nuxt'],
 
   css: ['~/assets/css/main.css'],
 
@@ -53,16 +53,6 @@ export default defineNuxtConfig({
       ],
       noscript: [{ innerHTML: `<link rel="stylesheet" href="${googleFontsUrl}">` }],
     },
-  },
-
-  /**
-   * El proveedor `ipx` de @nuxt/image depende de `sharp`, un binario nativo que no puede
-   * ejecutarse en Cloudflare Workers. Las imágenes se pre-generan en AVIF y se sirven ya
-   * optimizadas desde el CDN, por lo que aquí solo se pasan las URLs sin transformar.
-   */
-  image: {
-    provider: 'none',
-    domains: ['cdn.jsdelivr.net', 'raw.githubusercontent.com', 'images.unsplash.com'],
   },
 
   components: [
@@ -135,8 +125,11 @@ export default defineNuxtConfig({
       cartPageNoIndex: false,
       /** Habilita registro e inicio de sesión con email/contraseña. */
       authLocalProviderEnabled: false,
-      /** Base URL del CDN de imágenes de producto, sin barra final. */
-      productImagesCdnBase: '',
+      /**
+       * Raíz única del CDN de imágenes (sin barra final).
+       * Productos → `{imageCdnUrl}/products`, home → `/home`, etc.
+       */
+      imageCdnUrl: '',
       /**
        * `flat`: galería en la misma carpeta que el producto (`slug-gallery-n-variant.avif`).
        * `nested`: subcarpeta `gallery/`.

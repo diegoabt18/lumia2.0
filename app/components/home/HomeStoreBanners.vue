@@ -8,10 +8,10 @@
           :to="banner.href"
           class="group relative overflow-hidden rounded-2xl border border-lumia-ink/8 bg-lumia-beige/30 shadow-soft"
         >
-          <NuxtImg
+          <LumiaImage
             :src="banner.imageUrl"
             :alt="banner.title ?? 'Promoción LUMIA'"
-            class="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.02] sm:aspect-[21/9]"
+            img-class="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.02] sm:aspect-[21/9]"
             loading="lazy"
             sizes="(max-width: 768px) 100vw, 50vw"
           />

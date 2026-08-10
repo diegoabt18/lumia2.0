@@ -25,7 +25,6 @@
     "cf:tail:prod": "wrangler tail --env production"
   },
   "dependencies": {
-    "@nuxt/image": "^2.1.0",
     "@pinia/nuxt": "^1.0.1",
     "@tabler/icons-vue": "^3.46.0",
     "@vee-validate/zod": "^4.15.1",

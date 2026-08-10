@@ -19,7 +19,7 @@ import { randomBytes } from 'node:crypto'
 const SECRET_KEYS = [
   'NUXT_PUBLIC_TURNSTILE_SITE_KEY',
   'NUXT_PUBLIC_WHATSAPP_PHONE',
-  'NUXT_PUBLIC_PRODUCT_IMAGES_CDN_BASE',
+  'NUXT_PUBLIC_IMAGE_CDN_URL',
 ]
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')

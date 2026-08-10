@@ -14,11 +14,11 @@
           :key="src ? `${src}-${i}` : `placeholder-${i}`"
           class="aspect-square overflow-hidden rounded-lg bg-lumia-beige/60"
         >
-          <NuxtImg
+          <LumiaImage
             v-if="src"
             :src="src"
             alt=""
-            class="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+            img-class="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             loading="lazy"
             sizes="(max-width: 768px) 50vw, 16vw"
           />
@@ -32,13 +32,12 @@
 import { discoverMomentsGalleryImages } from '~/composables/useHomeHeroImages'
 
 const config = useRuntimeConfig()
-const cdnBase =
-  (typeof config.public.productImagesCdnBase === 'string' && config.public.productImagesCdnBase.trim()) || ''
+const { imageCdnUrl } = useImageCdn()
 const maxImages = Math.min(24, Math.max(1, Number(config.public.homeMomentsMaxImages) || 12))
 
 const { data: galleryImages } = useAsyncData(
   'home-moments-gallery',
-  () => discoverMomentsGalleryImages(cdnBase, maxImages),
+  () => discoverMomentsGalleryImages(imageCdnUrl, maxImages),
   { server: false, lazy: true, default: () => [] as string[] }
 )
 

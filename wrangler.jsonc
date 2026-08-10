@@ -13,6 +13,7 @@
   "vars": {
     "NUXT_API_BASE_URL": "https://api.lumiadalistore.com",
     "NUXT_SITE_URL": "http://localhost:8787",
+    "NUXT_PUBLIC_IMAGE_CDN_URL": "https://raw.githubusercontent.com/lumiadali/lumia_images/refs/heads/main",
     "NUXT_PUBLIC_STORE_CURRENCY": "COP",
     "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
     "NUXT_PUBLIC_STORE_TIMEZONE": "America/Bogota",
@@ -30,6 +31,7 @@
       "vars": {
         "NUXT_API_BASE_URL": "https://api.lumiadalistore.com",
         "NUXT_SITE_URL": "https://lumiadalistore.com",
+        "NUXT_PUBLIC_IMAGE_CDN_URL": "https://raw.githubusercontent.com/lumiadali/lumia_images/refs/heads/main",
         "NUXT_PUBLIC_STORE_CURRENCY": "COP",
         "NUXT_PUBLIC_STORE_LOCALE": "es-CO",
         "NUXT_PUBLIC_STORE_TIMEZONE": "America/Bogota",
