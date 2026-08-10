@@ -15,11 +15,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
 
-/** Solo claves que el frontend proxy pueda necesitar como secreto en Workers. */
+/** Solo secretos. NUXT_PUBLIC_IMAGE_CDN_URL vive en wrangler.jsonc → vars (no aquí). */
 const SECRET_KEYS = [
   'NUXT_PUBLIC_TURNSTILE_SITE_KEY',
   'NUXT_PUBLIC_WHATSAPP_PHONE',
-  'NUXT_PUBLIC_IMAGE_CDN_URL',
 ]
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
