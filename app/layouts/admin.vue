@@ -40,9 +40,13 @@
 const route = useRoute()
 const { user, logout } = useAuth()
 
-const adminLinks = [{ to: '/admin/design-system', label: 'Design system' }]
+const adminLinks = [
+  { to: '/admin/pos', label: 'POS' },
+  { to: '/admin/design-system', label: 'Design system' },
+]
 
 const pageTitle = computed(() => {
+  if (route.path.startsWith('/admin/pos')) return 'Punto de venta'
   if (route.path.startsWith('/admin/design-system')) return 'Sistema de diseño'
   return 'Administración'
 })
