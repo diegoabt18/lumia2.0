@@ -1,11 +1,19 @@
+import type {
+  PosPaymentConfig,
+  PosProductSearchResult,
+  PosCustomer,
+  PosSaleResult,
+  PosSaleView,
+} from '#shared/types/pos'
+
 export function usePosApi() {
-  async function getPaymentMethods() {
-    return $fetch<{ methods: PosPaymentMethod[] }>('/api/admin/pos/payment-methods')
+  async function getPaymentMethods(): Promise<PosPaymentConfig> {
+    return $fetch<PosPaymentConfig>('/api/admin/pos/payment-methods')
   }
 
-  async function searchProducts(search: string, limit = 12) {
-    return $fetch<{ products: PosProduct[] }>('/api/admin/pos/products', {
-      query: { search, limit },
+  async function searchProducts(search: string, page = 1, pageSize = 10) {
+    return $fetch<PosProductSearchResult>('/api/admin/pos/products', {
+      query: { search, page, pageSize },
     })
   }
 

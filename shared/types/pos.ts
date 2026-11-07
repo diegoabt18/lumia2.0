@@ -1,8 +1,35 @@
+/** POS payment method identifiers (distinct from payment status). */
+export type PosPaymentMethodId = 'cash' | 'bank_transfer'
+
+/** POS payment statuses (distinct from payment method). */
+export type PosPaymentStatus = 'pending_manual' | 'paid'
+
 export interface PosPaymentMethod {
   methodId: string
   displayName: string
   description: string
+  /** When false, sales using this method must start as pending_manual. */
   supportsPaid: boolean
+}
+
+export interface PosBankTransferDetails {
+  bankName: string
+  accountNumber: string
+  accountHolder: string
+  taxId?: string
+  instructions?: string
+}
+
+export interface PosPaymentConfig {
+  methods: PosPaymentMethod[]
+  bankTransferDetails: PosBankTransferDetails | null
+}
+
+export interface PosPaymentEvent {
+  type: string
+  timestamp: string
+  actorId?: string | null
+  data?: Record<string, unknown>
 }
 
 export interface PosProductVariant {
@@ -27,11 +54,21 @@ export interface PosProduct {
   variants: PosProductVariant[]
 }
 
+export interface PosProductSearchResult {
+  products: PosProduct[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 export interface PosCustomer {
   id: string
   name: string
   email: string | null
   phone: string | null
+  /** 'counter' = cliente de mostrador (sin cuenta web). */
+  source?: 'account' | 'counter'
 }
 
 export interface PosSaleItem {
@@ -52,6 +89,8 @@ export interface PosCartItem {
   currency: string
   tracked: boolean
   isPerOrder: boolean
+  /** Stock snapshot taken when the line was added; the server re-validates on submit. */
+  available: number
 }
 
 export interface PosSaleView {
@@ -69,6 +108,7 @@ export interface PosSaleView {
   transferReference?: string | null
   paymentConfirmedByUserId?: string | null
   paymentConfirmedAt?: string | null
+  paymentEvents?: PosPaymentEvent[]
   customerName: string
   phone: string
   email: string | null
