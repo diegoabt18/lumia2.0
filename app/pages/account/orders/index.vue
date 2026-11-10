@@ -23,17 +23,20 @@
     <ul v-else class="mt-10 space-y-4">
       <li
         v-for="order in orders"
-        :key="order.orderNumber"
+        :key="customerReferenceOf(order)"
         class="rounded-2xl border border-lumia-ink/8 bg-white/70 p-5 shadow-soft"
       >
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p class="font-display text-lg text-lumia-ink">{{ order.orderNumber }}</p>
+            <p class="font-display text-lg text-lumia-ink">{{ customerReferenceOf(order) }}</p>
             <p class="mt-1 text-sm text-lumia-ink/55">{{ formatStoreDate(order.createdAt) }}</p>
           </div>
           <div class="text-right">
             <p class="font-display text-lg text-lumia-ink">{{ formatPrice(order.total, order.currency) }}</p>
             <p class="mt-1 text-xs uppercase tracking-wide text-lumia-ink/45">{{ statusLabel(order.paymentStatus) }}</p>
+            <p v-if="hasOutstandingBalance(order.balanceDue)" class="mt-1 text-xs text-lumia-ink/60">
+              Saldo pendiente {{ formatPrice(order.balanceDue ?? 0, order.currency) }}
+            </p>
           </div>
         </div>
         <div class="mt-4 flex flex-wrap gap-3">
@@ -73,9 +76,7 @@ watch(
 )
 
 function statusLabel(status: string) {
-  if (status === 'pending_manual') return 'Pago pendiente'
-  if (status === 'paid') return 'Pagado'
-  return status
+  return paymentStatusLabel(status)
 }
 
 useHead({ title: 'Mis pedidos — LUMIA' })

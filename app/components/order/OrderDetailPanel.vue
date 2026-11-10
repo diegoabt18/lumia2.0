@@ -25,13 +25,43 @@
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">Número de pedido</p>
-          <p class="mt-1 font-display text-2xl text-lumia-ink">{{ order.orderNumber }}</p>
+          <p class="mb-1 text-sm text-lumia-ink/60">Tu número de pedido:</p>
+          <OrderReferenceCopy :code="customerRef" />
           <p class="mt-2 text-sm text-lumia-ink/55">{{ formatStoreDate(order.createdAt) }}</p>
         </div>
         <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">{{ statusLabel(order.paymentStatus) }}</p>
       </div>
       <p class="mt-4 text-sm text-lumia-ink/60">
         Total: <span class="font-medium text-lumia-ink">{{ formatPrice(order.total, order.currency) }}</span>
+      </p>
+    </div>
+
+    <div v-if="order.balanceDue !== undefined" class="mt-6 rounded-xl border border-lumia-ink/8 bg-white p-6">
+      <h2 class="font-semibold text-lumia-ink">Pagos y saldo</h2>
+      <dl class="mt-4 space-y-2 text-sm text-lumia-ink/75">
+        <div class="flex justify-between font-semibold text-lumia-ink">
+          <dt>Pagas ahora</dt>
+          <dd>{{ formatPrice(Math.max(0, (order.initialPaymentRequired ?? order.total) - (order.paidAmount ?? 0)), order.currency) }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt>Total del pedido</dt>
+          <dd>{{ formatPrice(order.total, order.currency) }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt>Anticipo requerido</dt>
+          <dd>{{ formatPrice(order.initialPaymentRequired ?? order.total, order.currency) }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt>Pagado</dt>
+          <dd>{{ formatPrice(order.paidAmount ?? 0, order.currency) }}</dd>
+        </div>
+        <div class="flex justify-between font-semibold text-lumia-ink">
+          <dt>Saldo pendiente</dt>
+          <dd>{{ formatPrice(order.balanceDue ?? 0, order.currency) }}</dd>
+        </div>
+      </dl>
+      <p v-if="hasOutstandingBalance(order.balanceDue)" class="mt-4 text-xs text-lumia-ink/55">
+        El pedido se considera pagado cuando se cubre el saldo completo.
       </p>
     </div>
 
@@ -43,6 +73,13 @@
             <p class="font-medium text-lumia-ink">{{ item.name }}</p>
             <p v-if="item.variantLabel" class="text-sm text-lumia-ink/60">{{ item.variantLabel }}</p>
             <p class="text-xs text-lumia-ink/45">{{ item.quantity }} × {{ formatPrice(item.unitPrice, order.currency) }}</p>
+            <p v-if="item.fulfillmentMode" class="mt-1 text-xs text-lumia-ink/55">
+              {{ fulfillmentModeLabel(item.fulfillmentMode) }}
+              <span v-if="item.fulfillmentMode === 'made_to_order'">
+                · Anticipo {{ formatPrice(item.initialPaymentRequired ?? item.subtotal, order.currency) }}
+                · Saldo {{ formatPrice(item.balanceDue ?? 0, order.currency) }}
+              </span>
+            </p>
           </div>
           <p class="font-medium text-lumia-ink">{{ formatPrice(item.subtotal, order.currency) }}</p>
         </li>
@@ -143,7 +180,7 @@ const canDirectCancel = computed(
 
 const canRequestCancel = computed(
   () =>
-    props.order.paymentStatus === 'paid' &&
+    (props.order.paymentStatus === 'paid' || (props.order.paidAmount ?? 0) > 0) &&
     !props.order.cancellationRequested &&
     !['cancelled', 'delivered', 'expired'].includes(props.order.status)
 )
@@ -173,15 +210,15 @@ async function onCancel() {
 }
 
 function statusLabel(status: string) {
-  if (status === 'pending_manual') return 'Pago pendiente'
-  if (status === 'paid') return 'Pagado'
-  return status
+  return paymentStatusLabel(status)
 }
+
+const customerRef = computed(() => customerReferenceOf(props.order))
 
 const whatsappOrder = computed<OrderForWhatsApp | null>(() => {
   const o = props.order
   return {
-    orderNumber: o.orderNumber,
+    orderNumber: customerReferenceOf(o),
     createdAt: o.createdAt,
     customerName: o.customerName,
     phone: o.phone,

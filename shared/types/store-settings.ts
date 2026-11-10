@@ -46,4 +46,6 @@ export interface NotificationPreferences {
   promotions: boolean
   orderStatus: boolean
   newProducts: boolean
+  /** Suscripción al newsletter. */
+  newsletter?: boolean
 }

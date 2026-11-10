@@ -477,6 +477,12 @@
             Total: <span class="font-medium">{{ formatPrice(lastSale.order.total, lastSale.order.currency) }}</span>
           </p>
           <p class="text-sm text-lumia-ink/70">
+            Saldo pendiente:
+            <span class="font-medium" :class="balanceOf(lastSale.order) > 0 ? 'text-amber-700' : 'text-emerald-700'">
+              {{ formatPrice(balanceOf(lastSale.order), lastSale.order.currency) }}
+            </span>
+          </p>
+          <p class="text-sm text-lumia-ink/70">
             Método: <span class="font-medium">{{ methodLabel(lastSale.order.paymentMethod) }}</span>
           </p>
           <p class="text-sm text-lumia-ink/70">
@@ -521,12 +527,45 @@
             >
               Ver comprobante
             </a>
+            <div
+              v-if="balanceOf(lastSale.order) > 0"
+              class="w-full rounded-xl border border-emerald-200/80 bg-white/70 p-3"
+            >
+              <p class="text-sm font-medium text-lumia-ink">Registrar abono</p>
+              <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                <p class="lumia-field-input flex items-center tabular-nums">{{ formatPrice(nextDueOf(lastSale.order), lastSale.order.currency) }}</p>
+                <select v-model="abonoMethod" class="lumia-field-input">
+                  <option value="cash">Efectivo</option>
+                  <option value="bank_transfer">Transferencia</option>
+                </select>
+                <input
+                  v-if="abonoMethod === 'cash'"
+                  v-model.number="abonoReceived"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="lumia-field-input"
+                  placeholder="Efectivo recibido"
+                />
+                <input
+                  v-else
+                  v-model="abonoReference"
+                  type="text"
+                  class="lumia-field-input"
+                  placeholder="Referencia / comprobante"
+                />
+              </div>
+              <p v-if="abonoError" class="mt-2 text-xs text-rose-600">{{ abonoError }}</p>
+              <BaseButton class="mt-2" variant="secondary" :disabled="abonoSubmitting" @click="registerAbono">
+                {{ abonoSubmitting ? 'Registrando…' : 'Registrar abono' }}
+              </BaseButton>
+            </div>
             <BaseButton
               v-if="lastSale.order.paymentStatus !== 'paid'"
               variant="secondary"
               @click="openConfirmDialog"
             >
-              Confirmar pago
+              Cobrar saldo
             </BaseButton>
             <BaseButton variant="ghost" @click="resetForm">Nueva venta</BaseButton>
           </div>
@@ -539,7 +578,7 @@
       <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-soft">
         <h3 class="font-display text-lg text-lumia-ink">Confirmar pago</h3>
         <p class="mt-1 text-sm text-lumia-ink/60">
-          Venta {{ lastSale?.order.receiptNumber }} — {{ formatPrice(lastSale?.order.total ?? 0, lastSale?.order.currency ?? 'COP') }}
+          Venta {{ lastSale?.order.receiptNumber }} — saldo {{ formatPrice(lastSale ? balanceOf(lastSale.order) : 0, lastSale?.order.currency ?? 'COP') }}
         </p>
         <p class="mt-1 text-xs text-lumia-ink/50">
           Método: {{ methodLabel(lastSale?.order.paymentMethod ?? '') }}. La confirmación registra quién verificó el pago y cuándo.
@@ -557,10 +596,10 @@
             </span>
           </div>
           <p
-            v-if="confirmCashReceived !== null && lastSale && confirmCashReceived < lastSale.order.total"
+            v-if="confirmCashReceived !== null && lastSale && confirmCashReceived < nextDueOf(lastSale.order)"
             class="text-xs text-rose-600"
           >
-            El importe recibido no puede ser inferior al total.
+            El importe recibido no puede ser inferior al saldo pendiente.
           </p>
         </div>
 
@@ -584,7 +623,7 @@
         <div class="mt-4 flex justify-end gap-2">
           <BaseButton variant="ghost" @click="confirmDialogOpen = false">Cancelar</BaseButton>
           <BaseButton :disabled="confirming || !canConfirmPayment" @click="confirmPayment">
-            {{ confirming ? 'Confirmando…' : 'Marcar como pagado' }}
+            {{ confirming ? 'Confirmando…' : 'Cobrar saldo' }}
           </BaseButton>
         </div>
       </div>
@@ -664,6 +703,28 @@ function posApiErrorMessage(e: unknown, fallback: string): string {
 const isSubmitting = ref(false)
 const submitError = ref('')
 const lastSale = ref<PosSaleResult | null>(null)
+
+/** Saldo que falta por cobrar de una venta (G3). Sin dato del servidor: total si no está pagada. */
+function balanceOf(order: { total: number; paymentStatus: string; balanceDue?: number }): number {
+  if (typeof order.balanceDue === 'number') return order.balanceDue
+  return order.paymentStatus === 'paid' ? 0 : order.total
+}
+
+/** Importe exacto que se cobra ahora: el anticipo pendiente, o el saldo completo si el anticipo ya está pagado. */
+function nextDueOf(order: { total: number; paymentStatus: string; balanceDue?: number; nextPaymentRequired?: number }): number {
+  if (typeof order.nextPaymentRequired === 'number') return order.nextPaymentRequired
+  return balanceOf(order)
+}
+
+// Abono parcial sobre la venta en curso (G3): importe, método y datos de verificación.
+const abonoAmount = ref<number | null>(null)
+const abonoMethod = ref<'cash' | 'bank_transfer'>('cash')
+const abonoReceived = ref<number | null>(null)
+const abonoReference = ref('')
+const abonoSubmitting = ref(false)
+const abonoError = ref('')
+// Clave de idempotencia: un reintento del mismo abono no vuelve a cobrar (pérdida de conexión).
+let abonoKey: { fingerprint: string; key: string } | null = null
 const idempotencyKey = ref(crypto.randomUUID())
 
 const confirmDialogOpen = ref(false)
@@ -718,7 +779,7 @@ const change = computed(() => {
 })
 const confirmChange = computed(() => {
   if (!lastSale.value || confirmCashReceived.value === null) return 0
-  return confirmCashReceived.value - lastSale.value.order.total
+  return confirmCashReceived.value - nextDueOf(lastSale.value.order)
 })
 const canSubmit = computed(() => {
   if (!cart.value.length || hasMixedCurrency.value || discountError.value) return false
@@ -732,7 +793,7 @@ const canConfirmPayment = computed(() => {
   if (!lastSale.value) return false
   if (lastSale.value.order.paymentMethod === 'cash') {
     if (confirmCashReceived.value === null) return false
-    return confirmCashReceived.value >= lastSale.value.order.total
+    return confirmCashReceived.value >= nextDueOf(lastSale.value.order)
   }
   return true
 })
@@ -1053,9 +1114,7 @@ function receiptUrl(sale: PosSaleResult) {
 }
 
 function statusLabel(status: string) {
-  if (status === 'pending_manual') return 'Pendiente de pago manual'
-  if (status === 'paid') return 'Pagado'
-  return status
+  return paymentStatusLabel(status)
 }
 
 function methodLabel(methodId: string) {
@@ -1090,11 +1149,69 @@ function confirmationActorLabel(actorId: string) {
 
 function openConfirmDialog() {
   if (!lastSale.value) return
-  confirmCashReceived.value = lastSale.value.order.cashReceived ?? lastSale.value.order.total
+  confirmCashReceived.value = lastSale.value.order.cashReceived ?? nextDueOf(lastSale.value.order)
   confirmTransferReference.value = lastSale.value.order.transferReference ?? ''
   confirmNote.value = ''
   confirmError.value = ''
   confirmDialogOpen.value = true
+}
+
+/** Registra un abono parcial en la venta actual. El servidor valida importe, saldo y referencia. */
+async function registerAbono() {
+  if (!lastSale.value) return
+  abonoError.value = ''
+  const order = lastSale.value.order
+  // Importe exacto: el anticipo completo o, ya pagado el anticipo, el saldo completo.
+  const amount = nextDueOf(order)
+  if (!(amount > 0)) {
+    abonoError.value = 'No hay importe pendiente por cobrar.'
+    return
+  }
+  const payload: Record<string, unknown> = { method: abonoMethod.value, amount }
+  if (abonoMethod.value === 'cash') {
+    if (abonoReceived.value === null || abonoReceived.value < amount) {
+      abonoError.value = 'El efectivo recibido no puede ser inferior al abono.'
+      return
+    }
+    payload.receivedAmount = abonoReceived.value
+  } else {
+    if (!abonoReference.value.trim()) {
+      abonoError.value = 'La transferencia requiere la referencia bancaria.'
+      return
+    }
+    payload.transferReference = abonoReference.value.trim()
+  }
+
+  // Misma operación reintentada → misma clave; cambio de importe, método o referencia → clave nueva.
+  const fingerprint = `${order.id}|${JSON.stringify(payload)}`
+  if (!abonoKey || abonoKey.fingerprint !== fingerprint) {
+    abonoKey = { fingerprint, key: crypto.randomUUID() }
+  }
+  payload.idempotencyKey = abonoKey.key
+
+  abonoSubmitting.value = true
+  try {
+    const summary = await $fetch<{ paidAmount: number; balanceDue: number; paymentStatus: string; status: string }>(
+      `/api/admin/orders/${encodeURIComponent(order.id)}/payments`,
+      { method: 'POST', body: payload },
+    )
+    abonoKey = null
+    lastSale.value.order = {
+      ...order,
+      paidAmount: summary.paidAmount,
+      balanceDue: summary.balanceDue,
+      paymentStatus: summary.paymentStatus,
+      status: summary.status,
+    }
+    abonoAmount.value = null
+    abonoReceived.value = null
+    abonoReference.value = ''
+    toast.success('Abono registrado')
+  } catch (e: unknown) {
+    abonoError.value = posApiErrorMessage(e, 'No se pudo registrar el abono')
+  } finally {
+    abonoSubmitting.value = false
+  }
 }
 
 async function confirmPayment() {
@@ -1103,9 +1220,10 @@ async function confirmPayment() {
   confirmError.value = ''
   try {
     const payload: Record<string, unknown> = { note: confirmNote.value.trim() || undefined }
+    const balance = nextDueOf(lastSale.value.order)
     if (lastSale.value.order.paymentMethod === 'cash') {
-      if (confirmCashReceived.value === null || confirmCashReceived.value < lastSale.value.order.total) {
-        confirmError.value = 'El importe recibido en efectivo no puede ser inferior al total'
+      if (confirmCashReceived.value === null || confirmCashReceived.value < balance) {
+        confirmError.value = 'El importe recibido en efectivo no puede ser inferior al saldo pendiente'
         return
       }
       if (confirmCashReceived.value > POS_MAX_AMOUNT) {
@@ -1113,7 +1231,7 @@ async function confirmPayment() {
         return
       }
       payload.cashReceived = confirmCashReceived.value
-      payload.changeGiven = Math.max(0, confirmCashReceived.value - lastSale.value.order.total)
+      payload.changeGiven = Math.max(0, confirmCashReceived.value - balance)
     }
     if (lastSale.value.order.paymentMethod === 'bank_transfer') {
       payload.transferReference = confirmTransferReference.value.trim() || undefined
@@ -1131,6 +1249,10 @@ async function confirmPayment() {
 
 function resetForm() {
   lastSale.value = null
+  abonoAmount.value = null
+  abonoReceived.value = null
+  abonoReference.value = ''
+  abonoError.value = ''
   cart.value = []
   discountAmount.value = 0
   notes.value = ''

@@ -39,7 +39,7 @@
         />
 
         <CheckoutOrderSummary
-          class="lg:order-2"
+          class="lg:order-2 lg:col-start-2 lg:row-span-2 lg:row-start-1"
           :items="items"
           :count="count"
           :subtotal="total"
@@ -49,7 +49,14 @@
           :free-shipping="shippingQuote.freeShipping"
         />
 
-        <div class="mt-3 min-w-0 rounded-xl border border-lumia-ink/8 bg-white p-3 shadow-soft sm:mt-6 sm:rounded-2xl sm:p-4 md:p-6 lg:order-1 lg:mt-0 lg:p-8">
+        <CheckoutPaymentPlan
+          class="mt-3 lg:order-1 lg:col-start-1 lg:row-start-1 lg:mt-0 sm:mt-6"
+          :quote="checkoutQuote"
+          :loading="quoteLoading"
+          :error="quoteError"
+        />
+
+        <div class="mt-3 min-w-0 rounded-xl border border-lumia-ink/8 bg-white p-3 shadow-soft sm:mt-6 sm:rounded-2xl sm:p-4 md:p-6 lg:order-1 lg:col-start-1 lg:row-start-2 lg:mt-6 lg:p-8">
           <div class="mb-4 flex flex-col gap-3 rounded-lg border border-lumia-ink/10 bg-lumia-cream/35 p-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:rounded-2xl sm:p-6">
             <div class="min-w-0 flex-1">
               <p class="text-xs font-semibold uppercase tracking-wide text-lumia-ink/45">Identificación</p>
@@ -208,6 +215,7 @@ const config = useRuntimeConfig()
 const turnstileSiteKey = computed(() => String(config.public.turnstileSiteKey || '').trim())
 
 const { items, count, total, clearCart, syncToServer } = useCart()
+const { quote: checkoutQuote, loading: quoteLoading, error: quoteError } = useCheckoutQuote()
 const { user, loginWithGoogle } = useAuth()
 const toast = useToast()
 const { quote } = useStoreShipping()

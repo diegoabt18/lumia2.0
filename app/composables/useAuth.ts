@@ -11,6 +11,7 @@ interface AuthUser {
     promotions?: boolean
     orderStatus?: boolean
     newProducts?: boolean
+    newsletter?: boolean
   }
 }
 

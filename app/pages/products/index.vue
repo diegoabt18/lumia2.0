@@ -329,10 +329,28 @@ function emptyCatalogView(): CatalogView {
   }
 }
 
-/** Categoría → filtro local; búsqueda, promo u orden → servidor. */
+/** Categoría y promo → filtro local; búsqueda u orden → servidor. */
 const needsServerCatalog = computed(
-  () => promoOnly.value || Boolean(searchApplied.value) || sortBy.value !== '--'
+  () => Boolean(searchApplied.value) || sortBy.value !== '--'
 )
+
+/** Un producto está en promoción si alguna variante tiene un descuento activo. */
+function hasActivePromotion(product: Product) {
+  return product.variants?.some((v) => v.promotionPercentOff != null) ?? false
+}
+
+/** Pagina una lista ya filtrada en el cliente. */
+function paginateLocal(all: Product[]): CatalogView {
+  const total = all.length
+  const totalPages = Math.max(1, Math.ceil(total / limit.value))
+  const safePage = Math.min(page.value, totalPages)
+  const start = (safePage - 1) * limit.value
+  return {
+    products: all.slice(start, start + limit.value),
+    source: 'api',
+    pagination: { page: safePage, limit: limit.value, total, totalPages },
+  }
+}
 
 const {
   data: catalogSnapshot,
@@ -358,7 +376,9 @@ async function fetchServerCatalog() {
   try {
     const result = await catalogQuery()
     if (generation !== serverFetchGeneration) return
-    serverCatalog.value = result
+    serverCatalog.value = promoOnly.value
+      ? paginateLocal(result.products.filter(hasActivePromotion))
+      : result
   } catch (e) {
     if (generation !== serverFetchGeneration) return
     serverError.value = e
@@ -380,32 +400,23 @@ const clientCatalog = computed((): CatalogView | null => {
   const all = catalogSnapshot.value?.products ?? []
   if (!all.length) return null
 
-  const list = selectedCategory.value
+  let list = selectedCategory.value
     ? all.filter((p) => p.categorySlug === selectedCategory.value)
     : all
+  if (promoOnly.value) list = list.filter(hasActivePromotion)
 
-  const total = list.length
-  const totalPages = Math.max(1, Math.ceil(total / limit.value))
-  const safePage = Math.min(page.value, totalPages)
-  const start = (safePage - 1) * limit.value
-
-  return {
-    products: list.slice(start, start + limit.value),
-    source: catalogSnapshot.value?.source ?? 'api',
-    pagination: { page: safePage, limit: limit.value, total, totalPages },
-  }
+  return paginateLocal(list)
 })
 
 function catalogQuery() {
   const sort = sortBy.value !== '--' ? sortBy.value : undefined
-  const promo = promoOnly.value ? '1' : undefined
+  // Con filtro de promo se trae un lote amplio y se filtra en el cliente (el backend no aplica `promo`).
   return catalog.fetchProducts({
-    page: page.value,
-    limit: limit.value,
+    page: promoOnly.value ? 1 : page.value,
+    limit: promoOnly.value ? 100 : limit.value,
     search: searchApplied.value || undefined,
     category: selectedCategory.value || undefined,
     sort,
-    promo,
   })
 }
 

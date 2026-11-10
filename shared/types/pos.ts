@@ -103,6 +103,12 @@ export interface PosSaleView {
   paymentStatus: string
   fulfillmentStatus: string
   paymentMethod: string
+  /** Pago inicial, pagado y saldo (G3). */
+  initialPaymentRequired?: number
+  paidAmount?: number
+  balanceDue?: number
+  /** Importe exacto que se cobra ahora (anticipo pendiente o saldo completo). */
+  nextPaymentRequired?: number
   cashReceived?: number | null
   changeGiven?: number | null
   transferReference?: string | null

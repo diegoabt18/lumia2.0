@@ -36,17 +36,17 @@
       </div>
     </div>
 
-    <div v-else class="mt-8 rounded-2xl border border-lumia-ink/10 bg-white/80 p-5 text-center">
-      <p class="text-sm text-lumia-ink/65">Inicia sesión para dejar tu reseña.</p>
+    <div v-else-if="loaded" class="mt-8 rounded-2xl border border-lumia-ink/10 bg-white/80 p-5 text-center">
+      <p class="text-sm text-lumia-ink/65">Inicia sesión para ver las reseñas y dejar tu opinión.</p>
       <BaseButton to="/auth/login" variant="secondary" class="mt-4">Entrar</BaseButton>
     </div>
 
-    <div v-if="pending && !data" class="mt-8 space-y-4">
+    <div v-if="user && pending && !data" class="mt-8 space-y-4">
       <div class="h-24 animate-pulse rounded-2xl bg-lumia-beige/50" />
       <div class="h-32 animate-pulse rounded-2xl bg-lumia-beige/40" />
     </div>
 
-    <div v-else-if="ratingCount > 0" class="mt-8 space-y-6">
+    <div v-else-if="user && ratingCount > 0" class="mt-8 space-y-6">
       <div class="rounded-2xl border border-lumia-ink/10 bg-white p-5">
         <div class="flex flex-wrap items-end gap-3">
           <span class="font-display text-3xl font-semibold text-lumia-ink">{{ ratingAverage.toFixed(1) }}</span>
@@ -93,7 +93,7 @@
       </BaseButton>
     </div>
 
-    <p v-else-if="!pending && shouldLoad" class="mt-8 text-sm text-lumia-ink/50">
+    <p v-else-if="user && !pending && shouldLoad" class="mt-8 text-sm text-lumia-ink/50">
       Aún no hay reseñas para este producto. ¡Sé el primero en opinar!
     </p>
   </section>
@@ -109,10 +109,11 @@ const props = defineProps<{
   initialCount?: number | null
 }>()
 
-const { user } = useAuth()
+const { user, loaded } = useAuth()
 const toast = useToast()
 
 const rootEl = ref<HTMLElement | null>(null)
+const inView = ref(false)
 const shouldLoad = ref(false)
 const page = ref(1)
 const loadingMore = ref(false)
@@ -224,13 +225,21 @@ async function submitReview() {
   }
 }
 
+// Las reseñas solo se piden cuando la sección es visible Y el usuario tiene sesión.
+watch(
+  [inView, user],
+  ([visible, loggedIn]) => {
+    if (visible && loggedIn) shouldLoad.value = true
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   const observer = new IntersectionObserver(
     (entries) => {
       if (entries.some((e) => e.isIntersecting)) {
-        shouldLoad.value = true
+        inView.value = true
         observer.disconnect()
-        void refresh()
       }
     },
     { rootMargin: '120px' }

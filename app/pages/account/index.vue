@@ -49,6 +49,39 @@
           </BaseButton>
         </div>
 
+        <div class="rounded-2xl border border-lumia-ink/8 bg-white/70 p-6 shadow-soft">
+          <h2 class="font-display text-lg text-lumia-ink">Newsletter</h2>
+          <p class="mt-3 text-sm leading-relaxed text-lumia-ink/65">
+            <template v-if="subscribed">
+              Estás suscrito: recibes lanzamientos, promociones y anuncios en {{ user.email }}.
+            </template>
+            <template v-else>No estás suscrito a nuestro newsletter.</template>
+          </p>
+          <BaseButton
+            v-if="subscribed"
+            type="button"
+            variant="ghost"
+            class="mt-4 text-rose-600"
+            @click="newsletterOpen = true"
+          >
+            Cancelar suscripción
+          </BaseButton>
+          <p class="mt-3 text-xs text-lumia-ink/45">Puedes cambiarlo en cualquier momento.</p>
+        </div>
+
+        <ConfirmDialog
+          :open="newsletterOpen"
+          title="¿Cancelar la suscripción?"
+          confirm-label="Sí, cancelar"
+          cancel-label="Seguir suscrito"
+          :pending="newsletterSaving"
+          @cancel="newsletterOpen = false"
+          @confirm="cancelNewsletter"
+        >
+          <p>Dejarás de recibir lanzamientos, promociones y anuncios por correo.</p>
+          <p>Puedes volver a suscribirte cuando quieras desde esta misma página o desde el inicio.</p>
+        </ConfirmDialog>
+
         <BaseButton type="button" variant="ghost" @click="logout">Cerrar sesión</BaseButton>
         <BaseButton type="button" variant="ghost" class="text-rose-600" @click="logoutAll">Cerrar sesión en todos los dispositivos</BaseButton>
       </aside>
@@ -74,7 +107,26 @@ const prefs = reactive<NotificationPreferences>({
   promotions: true,
   orderStatus: true,
   newProducts: false,
+  newsletter: false,
 })
+
+const { subscribed, setSubscribed } = useNewsletter()
+const newsletterOpen = ref(false)
+const newsletterSaving = ref(false)
+
+async function cancelNewsletter() {
+  newsletterSaving.value = true
+  try {
+    await setSubscribed(false)
+    prefs.newsletter = false
+    newsletterOpen.value = false
+    toast.success('Suscripción cancelada')
+  } catch {
+    toast.error('No se pudo cancelar la suscripción. Intenta de nuevo.')
+  } finally {
+    newsletterSaving.value = false
+  }
+}
 
 watch(
   user,
@@ -85,6 +137,7 @@ watch(
       prefs.promotions = u.notificationPreferences.promotions ?? true
       prefs.orderStatus = u.notificationPreferences.orderStatus ?? true
       prefs.newProducts = u.notificationPreferences.newProducts ?? false
+      prefs.newsletter = u.notificationPreferences.newsletter ?? false
     }
   },
   { immediate: true }

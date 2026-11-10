@@ -1,10 +1,29 @@
 import type { ApiShippingSettings, StoreBanner } from '#shared/types/store-settings'
 import { buildShippingConfig, mapApiShippingSettings, type ShippingConfig } from '#shared/pricing/shipping-cost'
 
+/** Valor por defecto del tooltip de promoción (ms), igual que en el servidor. */
+export const DEFAULT_PROMOTION_TOOLTIP_DELAY_MS = 1000
+
 export function useStoreSettings() {
   const shippingFromApi = useState<ApiShippingSettings | null>('store-shipping-api', () => null)
   const banners = useState<StoreBanner[]>('store-banners', () => [])
   const loaded = useState('store-settings-loaded', () => false)
+  const promotionTooltipDelayMs = useState<number>('store-promo-tooltip-delay', () => DEFAULT_PROMOTION_TOOLTIP_DELAY_MS)
+
+  async function loadCustomerSettings() {
+    try {
+      const res = await $fetch<{ settings?: { promotionTooltipDelayMs?: unknown } }>('/api/store/customer-settings', {
+        timeout: 8_000,
+      })
+      const raw = res.settings?.promotionTooltipDelayMs
+      promotionTooltipDelayMs.value =
+        typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= 5000
+          ? raw
+          : DEFAULT_PROMOTION_TOOLTIP_DELAY_MS
+    } catch {
+      promotionTooltipDelayMs.value = DEFAULT_PROMOTION_TOOLTIP_DELAY_MS
+    }
+  }
 
   async function loadShippingSettings() {
     try {
@@ -29,7 +48,11 @@ export function useStoreSettings() {
 
   async function ensureLoaded() {
     if (loaded.value) return
-    await Promise.all([loadShippingSettings(), loadBanners('homepage_secondary,catalog_top')])
+    await Promise.all([
+      loadShippingSettings(),
+      loadBanners('homepage_secondary,catalog_top'),
+      loadCustomerSettings(),
+    ])
     loaded.value = true
   }
 
@@ -54,6 +77,7 @@ export function useStoreSettings() {
     shippingFromApi: readonly(shippingFromApi),
     banners: readonly(banners),
     shippingConfig,
+    promotionTooltipDelayMs: readonly(promotionTooltipDelayMs),
     ensureLoaded,
     loadBanners,
     bannersFor,

@@ -22,6 +22,7 @@ export interface ProductVariant {
   productSlug: string
   sku: string
   options: Record<string, string>
+  optionValueIds?: string[]
   optionRules?: VariantOptionRule[]
   price: number
   compareAtPrice?: number
@@ -35,6 +36,8 @@ export interface ProductVariant {
   promotionPercentOff?: number
   promotionLabel?: string
   promotionEndsAt?: string
+  /** Color de fondo de la promoción en HEX (#rgb o #rrggbb). Opcional: sin valor se usa el dorado de Lumia. */
+  promotionColor?: string | null
   originalPrice?: number
 }
 

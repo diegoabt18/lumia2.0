@@ -40,7 +40,7 @@
             <div class="mt-5">
               <PdpBadgesRow :sales-badge="product.salesBadge ?? null" />
               <a
-                v-if="product.averageRating != null && product.reviewsCount"
+                v-if="user && product.averageRating != null && product.reviewsCount"
                 href="#opiniones"
                 class="mt-4 inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-full border border-lumia-ink/8 bg-white/70 px-4 py-2.5 shadow-soft transition hover:border-lumia-gold/35 hover:bg-white"
               >
@@ -69,7 +69,10 @@
                   −{{ selectedVariant.promotionPercentOff }}%
                 </span>
               </div>
-              <PdpStockBanner :stock="variantStockStatus === 'made_to_order' ? 999 : (selectedVariant?.stock ?? null)" />
+              <PdpStockBanner
+                :stock="selectedVariant?.stock ?? null"
+                :made-to-order="variantStockStatus === 'made_to_order'"
+              />
               <div v-if="variantStockStatus === 'made_to_order'" class="flex flex-wrap items-center gap-2">
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                   <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -91,7 +94,32 @@
               {{ product.description }}
             </p>
 
-            <div v-if="product.variants?.length" class="mt-10 space-y-3">
+            <!-- Opciones a partir del mapa `options` de las variantes (Tamaño, Aroma, Color…). -->
+            <div v-if="!visibleOptionAxes.length && derivedAxes.length" class="mt-10 space-y-6">
+              <fieldset v-for="axis in derivedAxes" :key="axis.name">
+                <legend class="mb-3 flex flex-wrap items-baseline gap-x-2 text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45">
+                  {{ axis.name }}
+                  <span class="text-sm font-medium normal-case tracking-normal text-lumia-ink">{{ selectedOptions[axis.name] }}</span>
+                </legend>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="value in axis.values"
+                    :key="value"
+                    type="button"
+                    class="min-h-11 min-w-[48px] rounded-lg border px-4 py-2.5 text-sm font-medium transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lumia-gold/60"
+                    :class="optionButtonClass(axis.name, value)"
+                    :aria-pressed="selectedOptions[axis.name] === value"
+                    @click="chooseOption(axis.name, value)"
+                  >
+                    <span :class="optionState(axis.name, value) === 'sold_out' ? 'line-through decoration-lumia-ink/40' : ''">{{ value }}</span>
+                    <span v-if="optionState(axis.name, value) === 'sold_out'" class="sr-only">(agotado)</span>
+                    <span v-else-if="optionState(axis.name, value) === 'unavailable'" class="sr-only">(no disponible con la selección actual)</span>
+                  </button>
+                </div>
+              </fieldset>
+            </div>
+
+            <div v-else-if="product.variants?.length && !visibleOptionAxes.length" class="mt-10 space-y-3">
               <label class="text-xs font-semibold uppercase tracking-[0.2em] text-lumia-ink/45" for="pdp-variant">
                 Variante
               </label>
@@ -239,6 +267,7 @@
 <script setup lang="ts">
 import type { Product, ProductOptionAxisDTO, ProductVariant } from '#shared/types/product'
 import { formatVariantLabel } from '#shared/variant-label'
+import { buildOptionAxes, findVariant, resolveVariantForChoice, variantOptions } from '#shared/variant-options'
 import { useMediaQuery, useWindowScroll } from '@vueuse/core'
 
 const route = useRoute()
@@ -276,6 +305,7 @@ const productErrorMessage = computed(() => {
 const { addItem, isAdding } = useCart()
 const { formatPrice } = useUtils()
 const { resolveProductImageSrc } = useProductImages()
+const { user } = useAuth()
 const toast = useToast()
 
 const buyNowPending = ref(false)
@@ -312,15 +342,43 @@ const maxQty = computed(() => {
   return Math.min(Math.max(s, 0), 99)
 })
 
-const variantStockStatus = computed<'in_stock' | 'made_to_order' | 'out_of_stock'>(() => {
-  const v = selectedVariant.value
+function stockStatusOf(v: ProductVariant | null): 'in_stock' | 'made_to_order' | 'out_of_stock' {
   if (!v) return 'out_of_stock'
   if (v.isMadeToOrder) return 'made_to_order'
   const stock = v.stock ?? v.available
   if (stock == null) return 'in_stock'
   if (stock > 0) return 'in_stock'
   return 'out_of_stock'
-})
+}
+
+const variantStockStatus = computed(() => stockStatusOf(selectedVariant.value))
+
+// ---------- Opciones derivadas del mapa `options` (ver shared/variant-options.ts) ----------
+const derivedAxes = computed(() => buildOptionAxes(product.value?.variants ?? []))
+const selectedOptions = computed<Record<string, string>>(() =>
+  selectedVariant.value ? variantOptions(selectedVariant.value) : {}
+)
+
+/** 'available' · 'sold_out' (la combinación existe sin stock) · 'unavailable' (no existe con lo elegido en los otros ejes). */
+function optionState(axis: string, value: string): 'available' | 'sold_out' | 'unavailable' {
+  const match = findVariant(product.value?.variants ?? [], derivedAxes.value, { ...selectedOptions.value, [axis]: value })
+  if (!match) return 'unavailable'
+  return stockStatusOf(match) === 'out_of_stock' ? 'sold_out' : 'available'
+}
+
+function optionButtonClass(axis: string, value: string) {
+  if (selectedOptions.value[axis] === value) return 'border-lumia-ink bg-lumia-ink text-white shadow-sm'
+  if (optionState(axis, value) === 'unavailable') {
+    return 'border-dashed border-lumia-ink/15 bg-white text-lumia-ink/40 hover:border-lumia-ink/30 hover:text-lumia-ink/70'
+  }
+  if (optionState(axis, value) === 'sold_out') return 'border-lumia-ink/10 bg-lumia-cream/40 text-lumia-ink/45 hover:border-lumia-ink/25'
+  return 'border-lumia-ink/15 bg-white text-lumia-ink/70 hover:border-lumia-ink/30 hover:text-lumia-ink'
+}
+
+function chooseOption(axis: string, value: string) {
+  const next = resolveVariantForChoice(product.value?.variants ?? [], derivedAxes.value, selectedVariant.value, axis, value)
+  if (next) selectedSku.value = next.sku
+}
 
 const visibleOptionAxes = computed<ProductOptionAxisDTO[]>(() => {
   const p = product.value
@@ -384,10 +442,26 @@ const legacyOptionEntries = computed(() => {
 watch(
   () => selectedVariant.value?.sku,
   () => {
+    const variant = selectedVariant.value
     const axes = visibleOptionAxes.value
+
+    // Preseleccionar valores desde optionValueIds si disponibles (para compatibilidad con opciones normalizadas)
+    if (variant?.optionValueIds?.length && axes.length) {
+      const selectedIds = new Set(variant.optionValueIds)
+      for (const axis of axes) {
+        const matchingValue = axis.values.find((v) => selectedIds.has(v.id))
+        if (matchingValue && !pdpByAxis[axis.id]) {
+          pdpByAxis[axis.id] = matchingValue.id
+        }
+      }
+    }
+
+    // Fallback: llenar ejes no seleccionados con primer valor disponible
     for (const axis of axes) {
-      const first = axis.values[0]
-      if (first && !pdpByAxis[axis.id]) pdpByAxis[axis.id] = first.id
+      if (!pdpByAxis[axis.id]) {
+        const first = axis.values[0]
+        if (first) pdpByAxis[axis.id] = first.id
+      }
     }
   },
   { immediate: true }
@@ -420,7 +494,7 @@ const stickyPriceLabel = computed(() => {
 
 const stickyVariantLabel = computed(() => {
   if (!selectedVariant.value) return ''
-  return variantSelectLabel(selectedVariant.value)
+  return formatVariantLabel(selectedVariant.value.options, selectedVariant.value.sku)
 })
 
 const related = computed(() => {
@@ -453,10 +527,12 @@ watch(
   { immediate: true }
 )
 
+/** "200 g · Lavanda — $35.000" (o el SKU si la variante no tiene opciones). */
 function variantSelectLabel(v: ProductVariant) {
   const unit = v.salePrice ?? v.price
   const price = formatPrice(unit, v.currency)
-  return `${v.sku} — ${price}`
+  const soldOut = stockStatusOf(v) === 'out_of_stock' ? ' (agotado)' : ''
+  return `${formatVariantLabel(v.options, v.sku)} — ${price}${soldOut}`
 }
 
 function openLightbox(i: number) {
@@ -544,7 +620,8 @@ useHead(() => {
     },
   }
 
-  if (p.averageRating != null && p.reviewsCount) {
+  // Solo se declara la valoración si las reseñas son visibles para el visitante.
+  if (user.value && p.averageRating != null && p.reviewsCount) {
     jsonLd.aggregateRating = {
       '@type': 'AggregateRating',
       ratingValue: String(p.averageRating),

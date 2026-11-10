@@ -43,6 +43,8 @@ const useWishlistShared = createSharedComposable(() => {
   const slugs = useState<string[]>('wishlist-slugs', () => [])
   const loaded = useState('wishlist-loaded', () => false)
   const pending = ref(false)
+  const busySlugs = reactive(new Set<string>())
+  const toast = useToast()
 
   let loadPromise: Promise<void> | null = null
 
@@ -123,8 +125,9 @@ const useWishlistShared = createSharedComposable(() => {
 
   async function toggle(productSlug: string): Promise<boolean | null> {
     const slug = productSlug.trim()
-    if (!slug || pending.value) return null
-    pending.value = true
+    // Ocupado por producto: un favorito en curso no bloquea los demás corazones.
+    if (!slug || busySlugs.has(slug)) return null
+    busySlugs.add(slug)
     try {
       if (auth.user.value) {
         const res = await $fetch<{ favorited: boolean }>('/api/account/favorites/toggle', {
@@ -157,11 +160,21 @@ const useWishlistShared = createSharedComposable(() => {
       slugs.value = list
       return favorited
     } catch (e) {
-      if (httpStatus(e) === 401) await auth.fetchUser()
+      if (httpStatus(e) === 401) {
+        await auth.fetchUser()
+        if (!auth.user.value) toast.info('Inicia sesión para guardar favoritos en tu cuenta.')
+        else toast.error('No se pudo actualizar favoritos. Intenta de nuevo.')
+      } else {
+        toast.error('No se pudo actualizar favoritos. Intenta de nuevo.')
+      }
       return null
     } finally {
-      pending.value = false
+      busySlugs.delete(slug)
     }
+  }
+
+  function isBusy(productSlug: string) {
+    return busySlugs.has(productSlug)
   }
 
   return {
@@ -171,15 +184,17 @@ const useWishlistShared = createSharedComposable(() => {
     load,
     toggle,
     isFavorited,
+    isBusy,
   }
 })
 
 export const useWishlist = useWishlistShared
 
 export function useProductWishlist(productSlug: MaybeRefOrGetter<string>) {
-  const { isFavorited, toggle, pending } = useWishlist()
+  const { isFavorited, isBusy, toggle } = useWishlist()
   const slug = computed(() => toValue(productSlug))
   const favorited = computed(() => isFavorited(slug.value))
+  const pending = computed(() => isBusy(slug.value))
 
   async function toggleWishlist() {
     return toggle(slug.value)
