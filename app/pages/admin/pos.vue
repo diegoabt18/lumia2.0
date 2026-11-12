@@ -528,7 +528,7 @@
               Ver comprobante
             </a>
             <div
-              v-if="balanceOf(lastSale.order) > 0"
+              v-if="balanceOf(lastSale.order) > 0 && can('orders.update')"
               class="w-full rounded-xl border border-emerald-200/80 bg-white/70 p-3"
             >
               <p class="text-sm font-medium text-lumia-ink">Registrar abono</p>
@@ -561,7 +561,7 @@
               </BaseButton>
             </div>
             <BaseButton
-              v-if="lastSale.order.paymentStatus !== 'paid'"
+              v-if="lastSale.order.paymentStatus !== 'paid' && can('orders.update')"
               variant="secondary"
               @click="openConfirmDialog"
             >
@@ -646,11 +646,11 @@ import type {
   PosSaleResult,
 } from '#shared/types/pos'
 
-definePageMeta({ layout: 'admin', middleware: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'pos' })
 
 const { formatPrice } = useUtils()
 const toast = useToast()
-const { user } = useAuth()
+const { user, can } = useAuth()
 const {
   getPaymentMethods,
   searchProducts: apiSearchProducts,

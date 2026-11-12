@@ -105,7 +105,6 @@ export function mapApiUserToAuthUser(data: unknown): { user: Record<string, unkn
   const email = typeof apiUser.email === 'string' ? apiUser.email : undefined
   const name = typeof apiUser.name === 'string' ? apiUser.name : undefined
   const nickname = typeof apiUser.nickname === 'string' ? apiUser.nickname : undefined
-  const role = apiUser.role === 'admin' ? 'admin' : 'user'
   const prefs = apiUser.notificationPreferences as Record<string, boolean> | undefined
 
   return {
@@ -115,7 +114,6 @@ export function mapApiUserToAuthUser(data: unknown): { user: Record<string, unkn
       nickname,
       email,
       avatar: typeof apiUser.avatar === 'string' ? apiUser.avatar : undefined,
-      role,
       notificationPreferences: prefs,
     },
   }

@@ -6,7 +6,6 @@ interface AuthUser {
   nickname?: string
   email?: string
   avatar?: string
-  role: 'user' | 'admin'
   notificationPreferences?: {
     promotions?: boolean
     orderStatus?: boolean
@@ -17,6 +16,8 @@ interface AuthUser {
 
 const useAuthShared = createSharedComposable(() => {
   const user = useState<AuthUser | null>('auth-user', () => null)
+  /** Permisos efectivos del Server (RBAC). Son la única fuente para decidir acceso. */
+  const permissions = useState<string[]>('auth-permissions', () => [])
   const loaded = useState('auth-loaded', () => false)
   const initStarted = useState('auth-init-started', () => false)
   const localProviderEnabled = computed(() => useRuntimeConfig().public.authLocalProviderEnabled)
@@ -31,6 +32,7 @@ const useAuthShared = createSharedComposable(() => {
       try {
         const res = await $fetch<{ user: AuthUser | null }>('/api/auth/me')
         user.value = res.user
+        permissions.value = res.user ? await fetchPermissions() : []
       } catch {
         user.value = null
       } finally {
@@ -40,6 +42,20 @@ const useAuthShared = createSharedComposable(() => {
     })()
 
     return fetchPromise
+  }
+
+  async function fetchPermissions(): Promise<string[]> {
+    try {
+      const res = await $fetch<{ permissions: string[] }>('/api/auth/permissions')
+      return res.permissions
+    } catch {
+      return []
+    }
+  }
+
+  /** true si el usuario tiene el permiso (o el comodín del Server). Solo oculta UI: el Server vuelve a autorizar. */
+  function can(permission: string): boolean {
+    return permissions.value.includes('*') || permissions.value.includes(permission)
   }
 
   if (import.meta.client && !initStarted.value) {
@@ -57,12 +73,15 @@ const useAuthShared = createSharedComposable(() => {
   async function logout() {
     await $fetch('/api/auth/logout', { method: 'POST' })
     user.value = null
+    permissions.value = []
     loaded.value = true
     await navigateTo('/')
   }
 
   return {
     user,
+    permissions,
+    can,
     loaded,
     localProviderEnabled,
     fetchUser,
