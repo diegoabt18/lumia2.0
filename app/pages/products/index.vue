@@ -81,6 +81,8 @@
           v-model:selected-category="selectedCategoryModel"
           v-model:promo-only="promoOnlyModel"
           :categories="categories"
+          :subcategories="subcategoryOptions"
+          v-model:selected-subcategory="selectedSubcategoryModel"
           :has-active-filters="hasActiveFilters"
           class="hidden lg:block lg:sticky lg:top-24 lg:w-full lg:max-w-[280px] lg:shrink-0 lg:self-start"
           @clear="clearFilters"
@@ -198,6 +200,8 @@
                 v-model:selected-category="selectedCategoryModel"
                 v-model:promo-only="promoOnlyModel"
                 :categories="categories"
+                :subcategories="subcategoryOptions"
+                v-model:selected-subcategory="selectedSubcategoryModel"
                 :has-active-filters="hasActiveFilters"
                 class="border-0 bg-transparent p-0 shadow-none"
                 @clear="clearFilters"
@@ -251,6 +255,9 @@ const page = computed(() => Math.max(1, Number(route.query.page) || 1))
 const limit = computed(() => Math.min(48, Math.max(12, Number(route.query.limit) || 12)))
 const searchApplied = computed(() => (typeof route.query.search === 'string' ? route.query.search.trim() : ''))
 const selectedCategory = computed(() => parseCategoryFromQuery(route.query.category))
+const selectedSubcategory = computed(() =>
+  typeof route.query.subcategory === 'string' ? route.query.subcategory.trim() : ''
+)
 const promoOnly = computed(() => route.query.promo === '1')
 
 const sortBy = computed({
@@ -273,6 +280,7 @@ type CatalogQueryPatch = Partial<{
   limit: string | undefined
   search: string | undefined
   category: string | undefined
+  subcategory: string | undefined
   promo: string | undefined
   sort: string | undefined
 }>
@@ -283,6 +291,7 @@ function buildQueryFromState(patch: CatalogQueryPatch = {}) {
     limit: limit.value !== 12 ? String(limit.value) : undefined,
     search: searchApplied.value || undefined,
     category: selectedCategory.value || undefined,
+    subcategory: selectedSubcategory.value || undefined,
     promo: promoOnly.value ? '1' : undefined,
     sort: sortBy.value !== '--' ? sortBy.value : undefined,
     ...patch,
@@ -301,8 +310,35 @@ function replaceCatalogQuery(patch: CatalogQueryPatch) {
 
 const selectedCategoryModel = computed({
   get: () => selectedCategory.value,
-  set: (slug: string) => replaceCatalogQuery({ category: slug || undefined, page: undefined }),
+  // Cambiar de categoría limpia la subcategoría: la anterior ya no pertenece a la nueva.
+  set: (slug: string) =>
+    replaceCatalogQuery({ category: slug || undefined, subcategory: undefined, page: undefined }),
 })
+
+const selectedSubcategoryModel = computed({
+  get: () => selectedSubcategory.value,
+  set: (slug: string) => replaceCatalogQuery({ subcategory: slug || undefined, page: undefined }),
+})
+
+type SubcategoryOption = { name: string; slug: string; productCount: number }
+const subcategoryOptions = ref<SubcategoryOption[]>([])
+
+watch(
+  selectedCategory,
+  async (slug) => {
+    subcategoryOptions.value = []
+    if (!slug) return
+    try {
+      const res = await $fetch<{ items?: SubcategoryOption[]; subcategories?: SubcategoryOption[] }>(
+        `/api/categories/${encodeURIComponent(slug)}/subcategories`,
+      )
+      subcategoryOptions.value = res.items ?? res.subcategories ?? []
+    } catch {
+      subcategoryOptions.value = []
+    }
+  },
+  { immediate: true },
+)
 
 const promoOnlyModel = computed({
   get: () => promoOnly.value,
@@ -312,7 +348,7 @@ const promoOnlyModel = computed({
 const catalogFetchKey = computed(() => {
   const sortKey = sortBy.value !== '--' ? sortBy.value : 'featured'
   const promoKey = promoOnly.value ? 'promo' : 'all'
-  return `${page.value}-${limit.value}-${searchApplied.value}-${selectedCategory.value}-${sortKey}-${promoKey}`
+  return `${page.value}-${limit.value}-${searchApplied.value}-${selectedCategory.value}-${selectedSubcategory.value}-${sortKey}-${promoKey}`
 })
 
 type CatalogView = {
@@ -331,7 +367,7 @@ function emptyCatalogView(): CatalogView {
 
 /** Categoría y promo → filtro local; búsqueda u orden → servidor. */
 const needsServerCatalog = computed(
-  () => Boolean(searchApplied.value) || sortBy.value !== '--'
+  () => Boolean(searchApplied.value) || sortBy.value !== '--' || Boolean(selectedSubcategory.value)
 )
 
 /** Un producto está en promoción si alguna variante tiene un descuento activo. */
@@ -416,6 +452,7 @@ function catalogQuery() {
     limit: promoOnly.value ? 100 : limit.value,
     search: searchApplied.value || undefined,
     category: selectedCategory.value || undefined,
+    subcategory: selectedSubcategory.value || undefined,
     sort,
   })
 }
@@ -454,7 +491,11 @@ const rangeEnd = computed(() => {
 })
 
 const hasActiveFilters = computed(
-  () => Boolean(selectedCategory.value) || promoOnly.value || Boolean(searchApplied.value)
+  () =>
+    Boolean(selectedCategory.value) ||
+    Boolean(selectedSubcategory.value) ||
+    promoOnly.value ||
+    Boolean(searchApplied.value)
 )
 
 const siteOrigin = useSiteOrigin()
@@ -499,7 +540,7 @@ function clearFilters() {
 
 function toggleCategoryChip(slug: string) {
   const next = selectedCategory.value === slug ? undefined : slug
-  replaceCatalogQuery({ category: next, page: undefined })
+  replaceCatalogQuery({ category: next, subcategory: undefined, page: undefined })
 }
 
 function goPage(next: number) {

@@ -13,6 +13,7 @@ export function useCatalog() {
     page?: number
     search?: string
     category?: string
+    subcategory?: string
     slugs?: string
     promo?: string
     sort?: string
@@ -26,6 +27,7 @@ export function useCatalog() {
         page,
         search: query.search,
         category: query.category,
+        subcategory: query.subcategory,
         slugs: query.slugs,
         promo: query.promo,
         sort: query.sort,

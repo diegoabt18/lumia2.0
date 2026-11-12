@@ -36,6 +36,31 @@
               <span v-if="cat.productCount != null" class="text-xs text-lumia-ink/40">{{ cat.productCount }}</span>
             </span>
           </label>
+          <ul
+            v-if="selectedCategory === cat.slug && subcategories.length"
+            class="ml-7 mt-3 space-y-2 border-l border-lumia-ink/10 pl-4"
+          >
+            <li v-for="sub in subcategories" :key="sub.slug">
+              <label
+                :for="`sub-${sub.slug}`"
+                class="flex cursor-pointer items-center gap-2 text-[13px]"
+                @click.prevent="toggleSubcategory(sub.slug)"
+              >
+                <input
+                  :id="`sub-${sub.slug}`"
+                  type="radio"
+                  name="subcategory-filter"
+                  class="h-3.5 w-3.5 border-lumia-ink/20 text-lumia-gold focus:ring-lumia-gold/40"
+                  :checked="selectedSubcategory === sub.slug"
+                  tabindex="-1"
+                >
+                <span class="flex flex-1 items-center justify-between gap-2 leading-snug">
+                  <span class="text-lumia-ink/85">{{ sub.name }}</span>
+                  <span class="text-xs text-lumia-ink/40">{{ sub.productCount }}</span>
+                </span>
+              </label>
+            </li>
+          </ul>
         </li>
       </ul>
     </section>
@@ -61,11 +86,14 @@ withDefaults(
   defineProps<{
     title?: string
     categories?: Category[]
+    /** Subcategorías de la categoría seleccionada (se muestran bajo ella). */
+    subcategories?: Array<{ name: string; slug: string; productCount: number }>
     hasActiveFilters?: boolean
   }>(),
   {
     title: 'Filtros',
     categories: () => [],
+    subcategories: () => [],
     hasActiveFilters: false,
   }
 )
@@ -73,9 +101,14 @@ withDefaults(
 defineEmits<{ clear: [] }>()
 
 const selectedCategory = defineModel<string>('selectedCategory', { default: '' })
+const selectedSubcategory = defineModel<string>('selectedSubcategory', { default: '' })
 const promoOnlyModel = defineModel<boolean>('promoOnly', { default: false })
 
 function toggleCategory(slug: string) {
   selectedCategory.value = selectedCategory.value === slug ? '' : slug
+}
+
+function toggleSubcategory(slug: string) {
+  selectedSubcategory.value = selectedSubcategory.value === slug ? '' : slug
 }
 </script>
