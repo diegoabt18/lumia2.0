@@ -14,7 +14,7 @@
         <NuxtLink
           v-for="cat in displayCategories"
           :key="cat.slug"
-          :to="`/products?category=${encodeURIComponent(cat.slug)}`"
+          :to="`/categorias/${encodeURIComponent(cat.slug)}`"
           class="group relative min-h-[5.5rem] overflow-hidden rounded-2xl border border-lumia-ink/8 bg-lumia-canvas p-4 shadow-soft transition hover:border-lumia-gold/35 hover:shadow-soft-lg sm:min-h-0 sm:p-6"
         >
           <p class="font-display text-base text-lumia-ink transition group-hover:text-lumia-gold sm:text-xl">

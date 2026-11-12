@@ -42,6 +42,33 @@
             </BaseButton>
           </div>
 
+          <!-- Filtros de jerarquía (opcionales). Cambiarlos no hace peticiones hasta elegir una opción. -->
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <label class="flex flex-col gap-1 text-[12px] font-medium text-lumia-ink/60">
+              Categoría
+              <select
+                v-model="posCategorySlug"
+                class="lumia-field-input h-10 text-sm font-normal text-lumia-ink"
+                @change="onPosCategoryChange"
+              >
+                <option value="">Todas las categorías</option>
+                <option v-for="c in posCategories" :key="c.slug" :value="c.slug">{{ c.name }}</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1 text-[12px] font-medium text-lumia-ink/60">
+              Subcategoría
+              <select
+                v-model="posSubcategorySlug"
+                class="lumia-field-input h-10 text-sm font-normal text-lumia-ink"
+                :disabled="!posCategorySlug"
+                @change="onPosSubcategoryChange"
+              >
+                <option value="">Todas las subcategorías</option>
+                <option v-for="s in posSubcategories" :key="s.slug" :value="s.slug">{{ s.name }}</option>
+              </select>
+            </label>
+          </div>
+
           <!-- Carga: filas esqueleto con la misma estructura de la tabla -->
           <div v-if="productsLoading" class="mt-4 divide-y divide-lumia-ink/8 rounded-xl border border-lumia-ink/8" role="status" aria-label="Buscando productos">
             <div v-for="n in 6" :key="n" class="flex h-16 items-center gap-3 px-3 animate-pulse">
@@ -80,7 +107,7 @@
           <!-- Resultados -->
           <template v-else>
             <p class="mt-4 text-xs text-lumia-ink/55">
-              {{ productTotal }} {{ productTotal === 1 ? 'resultado' : 'resultados' }} para "{{ submittedQuery }}"
+              {{ productTotal }} {{ productTotal === 1 ? 'resultado' : 'resultados' }} {{ resultsScopeLabel }}
             </p>
             <div class="mt-2 overflow-x-auto rounded-xl border border-lumia-ink/8">
               <table class="w-full min-w-[640px] text-sm">
@@ -825,15 +852,86 @@ const productTotal = ref(0)
 const productTotalPages = ref(1)
 let productRequestSeq = 0
 
+// ---------- Filtros de jerarquía (categoría → subcategoría) ----------
+interface PosCategoryOption { slug: string; name: string }
+interface PosSubcategoryOption { slug: string; name: string }
+const posCategorySlug = ref('')
+const posSubcategorySlug = ref('')
+const posCategories = ref<PosCategoryOption[]>([])
+const posSubcategories = ref<PosSubcategoryOption[]>([])
+/** Filtro con el que se hizo la última búsqueda (la paginación lo reutiliza). */
+const submittedFilter = ref<{ category: string; subcategory: string }>({ category: '', subcategory: '' })
+
+function currentPosFilter() {
+  return { category: posCategorySlug.value, subcategory: posSubcategorySlug.value }
+}
+
+const resultsScopeLabel = computed(() => {
+  const parts: string[] = []
+  if (submittedQuery.value) parts.push(`para "${submittedQuery.value}"`)
+  const cat = posCategories.value.find((c) => c.slug === submittedFilter.value.category)
+  const sub = posSubcategories.value.find((s) => s.slug === submittedFilter.value.subcategory)
+  if (cat) parts.push(`en ${cat.name}${sub ? ` › ${sub.name}` : ''}`)
+  return parts.join(' ')
+})
+
+async function loadPosCategories() {
+  try {
+    const res = await $fetch<{ items: Array<{ slug: string; name: string }> }>('/api/categories')
+    posCategories.value = (res.items ?? []).map((c) => ({ slug: c.slug, name: c.name }))
+  } catch {
+    // Sin categorías el POS sigue funcionando por texto; el selector queda vacío.
+    posCategories.value = []
+  }
+}
+
+async function loadPosSubcategories(categorySlug: string) {
+  posSubcategories.value = []
+  if (!categorySlug) return
+  try {
+    const res = await $fetch<{ items: Array<{ slug: string; name: string }> }>(
+      `/api/categories/${encodeURIComponent(categorySlug)}/subcategories`,
+    )
+    posSubcategories.value = (res.items ?? []).map((s) => ({ slug: s.slug, name: s.name }))
+  } catch {
+    posSubcategories.value = []
+  }
+}
+
+/** Aplica el filtro: si ya hay búsqueda o filtro, refresca resultados desde la página 1. */
+function applyPosFilter() {
+  const filter = currentPosFilter()
+  const hasAnything = Boolean(submittedQuery.value || productSearchInput.value.trim() || filter.category)
+  if (!hasAnything && !hasSearched.value) return
+  submittedFilter.value = filter
+  if (!filter.category && !submittedQuery.value) {
+    clearProductResults()
+    return
+  }
+  hasSearched.value = true
+  void runProductSearch(1)
+}
+
+async function onPosCategoryChange() {
+  posSubcategorySlug.value = ''
+  await loadPosSubcategories(posCategorySlug.value)
+  applyPosFilter()
+}
+
+function onPosSubcategoryChange() {
+  applyPosFilter()
+}
+
 async function runProductSearch(page: number) {
   const term = submittedQuery.value
-  if (!term) return
+  const scope = submittedFilter.value
+  if (!term && !scope.category) return
   // Only the latest request may update the view; older responses are ignored.
   const seq = ++productRequestSeq
   productsLoading.value = true
   productsError.value = ''
   try {
-    const res = await apiSearchProducts(term, page, productPageSize.value)
+    const res = await apiSearchProducts(term, page, productPageSize.value, scope)
     if (seq !== productRequestSeq) return
     productResults.value = res.products
     productTotal.value = res.total
@@ -855,8 +953,20 @@ function submitProductSearch() {
   // Same term already loading: do not send a duplicate request.
   if (term === submittedQuery.value && productsLoading.value) return
   submittedQuery.value = term
+  submittedFilter.value = currentPosFilter()
   hasSearched.value = true
   void runProductSearch(1)
+}
+
+function clearProductResults() {
+  productRequestSeq++
+  productsLoading.value = false
+  productsError.value = ''
+  productResults.value = []
+  productPage.value = 1
+  productTotal.value = 0
+  productTotalPages.value = 1
+  hasSearched.value = false
 }
 
 function goToProductPage(page: number) {
@@ -872,17 +982,19 @@ function changeProductPageSize(size: number) {
 }
 
 function clearProductSearch() {
-  productRequestSeq++
   productSearchInput.value = ''
   submittedQuery.value = ''
-  hasSearched.value = false
-  productsLoading.value = false
-  productsError.value = ''
-  productResults.value = []
-  productPage.value = 1
-  productTotal.value = 0
-  productTotalPages.value = 1
+  clearProductResults()
+  // Limpiar la búsqueda también quita los filtros de jerarquía.
+  posCategorySlug.value = ''
+  posSubcategorySlug.value = ''
+  posSubcategories.value = []
+  submittedFilter.value = { category: '', subcategory: '' }
 }
+
+onMounted(() => {
+  void loadPosCategories()
+})
 
 /** Estado de stock para la vista: agotado, bajo, normal o sin control de inventario. */
 function stockLevel(variant: PosProductVariant): 'out' | 'low' | 'ok' | 'na' {

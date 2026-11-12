@@ -11,9 +11,24 @@ export function usePosApi() {
     return $fetch<PosPaymentConfig>('/api/admin/pos/payment-methods')
   }
 
-  async function searchProducts(search: string, page = 1, pageSize = 10) {
+  /**
+   * Búsqueda de productos del POS. `search` es opcional si hay filtro de categoría
+   * (el Server rechaza búsquedas vacías sin filtro). `subcategory` acepta slug de subcategoría.
+   */
+  async function searchProducts(
+    search: string,
+    page = 1,
+    pageSize = 10,
+    scope: { category?: string; subcategory?: string } = {},
+  ) {
     return $fetch<PosProductSearchResult>('/api/admin/pos/products', {
-      query: { search, page, pageSize },
+      query: {
+        search: search || undefined,
+        page,
+        pageSize,
+        category: scope.category || undefined,
+        subcategory: scope.subcategory || undefined,
+      },
     })
   }
 
