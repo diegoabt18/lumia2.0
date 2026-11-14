@@ -80,7 +80,7 @@
         <ProductFiltersSidebar
           v-model:selected-category="selectedCategoryModel"
           v-model:promo-only="promoOnlyModel"
-          :categories="categories"
+          :categories="sidebarCategories"
           :subcategories="subcategoryOptions"
           v-model:selected-subcategory="selectedSubcategoryModel"
           :has-active-filters="hasActiveFilters"
@@ -115,7 +115,7 @@
           <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.3em] text-lumia-ink/45">Catálogo</p>
-              <h1 class="mt-2 font-display text-3xl font-medium text-lumia-ink md:text-4xl">Todas las velas</h1>
+              <h1 class="mt-2 font-display text-3xl font-medium text-lumia-ink md:text-4xl">{{ catalogTitle }}</h1>
             </div>
             <p v-if="!pending && pagination" class="text-xs text-lumia-ink/40">
               {{ rangeStart }}–{{ rangeEnd }} de {{ pagination.total }} productos
@@ -199,7 +199,7 @@
               <ProductFiltersSidebar
                 v-model:selected-category="selectedCategoryModel"
                 v-model:promo-only="promoOnlyModel"
-                :categories="categories"
+                :categories="sidebarCategories"
                 :subcategories="subcategoryOptions"
                 v-model:selected-subcategory="selectedSubcategoryModel"
                 :has-active-filters="hasActiveFilters"
@@ -217,6 +217,7 @@
 <script setup lang="ts">
 import { IconAdjustmentsHorizontal, IconSearch } from '@tabler/icons-vue'
 import { storeToRefs } from 'pinia'
+import type { Category } from '#shared/types/category'
 import type { Product } from '#shared/types/product'
 import { useCategoryStore } from '~/features/category/stores/category'
 
@@ -365,10 +366,59 @@ function emptyCatalogView(): CatalogView {
   }
 }
 
-/** Categoría y promo → filtro local; búsqueda u orden → servidor. */
+/**
+ * Categoría, subcategoría, búsqueda u orden → servidor (filtra sobre todo el catálogo).
+ * Solo la promo se filtra en cliente, porque el backend no aplica `promo`.
+ */
 const needsServerCatalog = computed(
-  () => Boolean(searchApplied.value) || sortBy.value !== '--' || Boolean(selectedSubcategory.value)
+  () =>
+    Boolean(searchApplied.value) ||
+    sortBy.value !== '--' ||
+    Boolean(selectedCategory.value) ||
+    Boolean(selectedSubcategory.value)
 )
+
+/**
+ * Conteo real por categoría: el `productCount` de /api/categories viene del backend y no coincide
+ * con el listado (p. ej. marca 0 en una categoría con productos). Usamos el total de /api/products.
+ */
+const { data: categoryCounts } = await useAsyncData(
+  'catalog-category-counts',
+  async () => {
+    const { categories: list } = await $fetch<{ categories: Category[] }>('/api/categories')
+    const entries = await Promise.all(
+      list.map(async (cat) => {
+        const res = await $fetch<{ pagination?: { total: number } }>('/api/products', {
+          query: { category: cat.slug, limit: 1 },
+        })
+        return [cat.slug, res.pagination?.total ?? 0] as const
+      })
+    )
+    return Object.fromEntries(entries) as Record<string, number>
+  },
+  { default: (): Record<string, number> => ({}) }
+)
+
+/** Categorías para la barra lateral con el conteo real. */
+const sidebarCategories = computed<Category[]>(() =>
+  categories.value.map((cat) => ({
+    ...cat,
+    productCount: categoryCounts.value[cat.slug] ?? cat.productCount,
+  }))
+)
+
+/** Título del listado: subcategoría activa > categoría activa > todo el catálogo. */
+const catalogTitle = computed(() => {
+  if (selectedSubcategory.value) {
+    const sub = subcategoryOptions.value.find((s) => s.slug === selectedSubcategory.value)
+    if (sub) return sub.name
+  }
+  if (selectedCategory.value) {
+    const cat = categories.value.find((c) => c.slug === selectedCategory.value)
+    if (cat) return cat.name
+  }
+  return 'Todas las velas'
+})
 
 /** Un producto está en promoción si alguna variante tiene un descuento activo. */
 function hasActivePromotion(product: Product) {
@@ -401,11 +451,21 @@ const serverCatalog = ref<CatalogView>(emptyCatalogView())
 const serverPending = ref(false)
 const serverError = ref<unknown>(null)
 let serverFetchGeneration = 0
+/** Filtros (sin página) de los resultados que se muestran actualmente. */
+let shownFilterKey = ''
+
+const serverFilterKey = computed(
+  () =>
+    `${searchApplied.value}|${selectedCategory.value}|${selectedSubcategory.value}|${sortBy.value}|${promoOnly.value}`
+)
 
 async function fetchServerCatalog() {
   if (!needsServerCatalog.value) return
 
   const generation = ++serverFetchGeneration
+  const filterKey = serverFilterKey.value
+  // Cambio de filtro: no mantener los resultados del filtro anterior mientras carga.
+  if (filterKey !== shownFilterKey) serverCatalog.value = emptyCatalogView()
   serverPending.value = true
   serverError.value = null
 
@@ -415,6 +475,7 @@ async function fetchServerCatalog() {
     serverCatalog.value = promoOnly.value
       ? paginateLocal(result.products.filter(hasActivePromotion))
       : result
+    shownFilterKey = filterKey
   } catch (e) {
     if (generation !== serverFetchGeneration) return
     serverError.value = e
@@ -436,10 +497,7 @@ const clientCatalog = computed((): CatalogView | null => {
   const all = catalogSnapshot.value?.products ?? []
   if (!all.length) return null
 
-  let list = selectedCategory.value
-    ? all.filter((p) => p.categorySlug === selectedCategory.value)
-    : all
-  if (promoOnly.value) list = list.filter(hasActivePromotion)
+  const list = promoOnly.value ? all.filter(hasActivePromotion) : all
 
   return paginateLocal(list)
 })
