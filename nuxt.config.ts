@@ -97,6 +97,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     /** Base URL del backend Fastify (ej. https://api.lumiadalistore.com). */
     apiBaseUrl: '',
+    /**
+     * Secreto compartido con la API (EDGE_PROXY_SECRET) para declarar la IP real del cliente.
+     * En producción: `wrangler secret put NUXT_EDGE_PROXY_SECRET --env production` (nunca en vars).
+     */
+    edgeProxySecret: '',
     siteUrl: '',
     resendApiKey: '',
     /** Remitente Resend, ej. LUMIA <pedidos@tudominio.com> */

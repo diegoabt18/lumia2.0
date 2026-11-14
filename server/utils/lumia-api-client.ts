@@ -45,7 +45,23 @@ function forwardRequestHeaders(event: H3Event): Record<string, string> {
     if (value) headers[name] = value
   }
 
+  Object.assign(headers, clientIpHeaders(event))
   return headers
+}
+
+/**
+ * IP real del cliente para la API (límites por cliente, auditoría y sesiones). En Cloudflare
+ * Workers, CF-Connecting-IP la fija Cloudflare en la petición entrante (no la elige el cliente);
+ * en desarrollo local se usa la IP del socket. El secreto compartido (EDGE_PROXY_SECRET del Server)
+ * es lo que hace que la API acepte la cabecera: sin él no se envía nada.
+ */
+function clientIpHeaders(event: H3Event): Record<string, string> {
+  const config = useRuntimeConfig()
+  const secret = String(config.edgeProxySecret ?? '').trim() || readWorkerEnv('NUXT_EDGE_PROXY_SECRET')
+  if (!secret) return {}
+  const ip = getHeader(event, 'cf-connecting-ip')?.trim() || getRequestIP(event)
+  if (!ip) return {}
+  return { 'x-lumia-client-ip': ip, 'x-lumia-proxy-secret': secret }
 }
 
 function forwardSetCookies(event: H3Event, response: Response) {
