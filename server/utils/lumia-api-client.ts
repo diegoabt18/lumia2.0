@@ -40,6 +40,13 @@ function forwardRequestHeaders(event: H3Event): Record<string, string> {
   const contentType = getHeader(event, 'content-type')
   if (contentType) headers['Content-Type'] = contentType
 
+  // El Server identifica el dispositivo de cada sesión con el navegador real: sin estas cabeceras
+  // todos los logins de un cliente parecían el mismo dispositivo y uno nuevo cerraba los demás.
+  const userAgent = getHeader(event, 'user-agent')
+  if (userAgent) headers['user-agent'] = userAgent.slice(0, 512)
+  const acceptLanguage = getHeader(event, 'accept-language')
+  if (acceptLanguage) headers['accept-language'] = acceptLanguage.slice(0, 128)
+
   for (const name of ['idempotency-key', 'x-cron-secret', 'x-request-id']) {
     const value = getHeader(event, name)
     if (value) headers[name] = value
