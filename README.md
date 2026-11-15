@@ -71,7 +71,7 @@ Cada carpeta tiene su `README.md`:
 - `app/components/product/` — tarjetas y galería
 - `app/features/shell/` — layout público
 - `app/features/cart/` — estado del carrito
-- `server/` — proxy API
+- `server/` — proxy API. Las rutas administrativas son **explícitas**: solo las del POS (`server/api/admin/pos/*` y `server/api/admin/orders/[id]/payments.post.ts`). Cualquier otra `/api/admin/*` responde 404; la administración vive en Lumia Admin
 - `shared/design-system/` — tokens de diseño
 
 ## Sistema de diseño
